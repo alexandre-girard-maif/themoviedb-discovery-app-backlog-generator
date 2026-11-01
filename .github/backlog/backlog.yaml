@@ -137,7 +137,7 @@ epics:
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres
           afin de maintenir une liste de genres cohérente et à jour.
 
-          Un module dédié **genre-repository** expose la recherche par identifiant, la liste des genres et
+          Un module dédié **src/back-end/database/genre-repository.ts** expose la recherche par identifiant, la liste des genres et
           l'insertion ou l'actualisation de leurs libellés. Un genre est représenté
           par un identifiant numérique `id` et un nom `name`.
         size: M
@@ -200,28 +200,65 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays
           afin de maintenir une liste de pays cohérente et à jour.
+
+          Un module dédié **src/back-end/database/country-repository.ts** expose la recherche par code, la liste des pays et
+          l'insertion ou l'actualisation de leurs libellés. Un pays est représenté
+          par un code `code` et un nom `name`.
         size: M
         priority: P1
         dependsOn: [DASHBOARD-02]
         acceptance:
-          - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés.
+          - La recherche par code renvoie le pays correspondant ou `undefined` si aucun pays n'existe.
+          - La liste renvoie les pays triés par code croissant et une liste vide si aucun pays n'est enregistré.
+          - L'insertion ou la mise à jour accepte un itérable de pays ; un code existant entraîne la mise à jour du nom sans créer de doublon.
+          - Un itérable vide ne modifie pas les données ; si un code apparaît plusieurs fois, le dernier libellé fourni est conservé.
         definitionOfDone:
-          - Le module dédié aux pays est implémenté.
-          - Des test unitaires couvrent la recherche, l'insertion et la mise à jour des pays.
+          - Le module de gestion des pays est implémenté en TypeScript avec `node:sqlite` et utilise le type `Country`.
+          - Des tests unitaires sur une base SQLite en mémoire couvrent la recherche d'un pays présent ou absent, la liste vide, le tri par code, l'insertion et la mise à jour sans doublon.
+          - Des tests couvrent les tableaux et autres itérables, l'entrée vide et les codes répétés.
       - id: DASHBOARD-06
         key: EXPL-COUNTRIES-CSV-IMPORT
         type: feature
         scope: backend
-        title: Importer et mettre à jour les pays à partir d'un fichier CSV
+        title: Importer les pays depuis un CSV et nettoyer les pays inutilisés
         story: |
-          En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
+          En tant que gestionnaire de la base de données des films, je veux importer
+          ou actualiser les pays depuis un fichier CSV et supprimer les pays
+          inutilisés afin de maintenir un catalogue cohérent.
+
+          Le CSV contient exactement les colonnes `code` et `name`. Les codes pays
+          sont au format de deux lettres majuscules, comme `FR`, `GB` ou `US`.
+          La commande `add-countries` utilise le module de gestion des pays de DASHBOARD-05 :
+
+          ```sh
+          node src/back-end/backend-cli.ts add-countries ./data/countries.csv
+          node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite add-countries ./data/countries.csv
+          ```
+
+          La commande `clean-countries` supprime uniquement les pays sans association
+          à un film dans `production_countries` :
+
+          ```sh
+          node src/back-end/backend-cli.ts clean-countries
+          node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite clean-countries
+          ```
         size: M
         priority: P2
         dependsOn: [DASHBOARD-05]
         acceptance:
-          - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
+          - Le parseur CSV accepte exactement les en-têtes `code` et `name`, dans n'importe quel ordre et sans distinction de casse.
+          - Les fins de ligne LF et CRLF, le BOM UTF-8, les espaces autour des valeurs, les virgules dans les champs entre guillemets et les guillemets échappés sont pris en charge.
+          - Les lignes vides sont ignorées et un document contenant uniquement les en-têtes renvoie une liste vide.
+          - Les codes contiennent exactement deux lettres majuscules et les noms sont non vides ; les en-têtes, valeurs et syntaxes CSV invalides provoquent une erreur explicite.
+          - La commande `add-countries <csv-file>` insère ou actualise les pays dans la base par défaut ou celle sélectionnée par `--path`, sans créer de doublons.
+          - Le CSV est validé avant l'ouverture de la base ; l'import est transactionnel, annulé en cas d'échec et l'erreur est propagée.
+          - La commande `clean-countries` supprime uniquement les pays absents de `production_countries` et conserve les pays associés à un film.
+          - Les commandes ferment la connexion SQLite et affichent le nombre de pays importés ou supprimés ainsi que le chemin de la base.
         definitionOfDone:
-          - Le module dédié aux pays est implémenté pour gérer l'importation depuis un fichier CSV.
+          - Le parseur CSV est implémenté avec `csv-parse/sync` et les commandes `add-countries` et `clean-countries` sont intégrées au CLI existant.
+          - Des tests unitaires couvrent les formats CSV acceptés, les lignes vides, le document limité aux en-têtes, les codes et noms invalides et les guillemets mal formés.
+          - Des tests du CLI couvrent l'import, le chemin configurable, l'annulation en cas d'échec, le nettoyage limité aux pays inutilisés, la fermeture de la connexion et les messages de résultat.
+          - Un fichier d'exemple `data/countries.csv` est fourni et les commandes d'import et de nettoyage sont documentées.
       - id: DASHBOARD-07
         key: DASHBOARD-07
         type: feature
