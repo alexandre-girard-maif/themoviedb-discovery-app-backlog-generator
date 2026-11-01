@@ -263,18 +263,40 @@ epics:
         key: DASHBOARD-07
         type: feature
         scope: backend
-        title: Consommer et exposer l'API discover
+        title: Exposer les films par année via l'API Discover
         story: |
-          En tant que gestionnaire de la base de données des films, je veux pouvoir consommer et exposer l'API discover afin de récupérer les films d'une année donnée.
+          En tant que gestionnaire de la base de données des films, je veux consulter
+          les films d'une année de sortie principale via une API interne qui interroge
+          l'API Discover de TMDB.
+
+          La route `GET /api/discover/movies` accepte une année obligatoire et les
+          paramètres optionnels `language`, `page` et `region` :
+
+          ```text
+          /api/discover/movies?year=2020
+          /api/discover/movies?year=2020&language=en-US&page=2&region=US
+          ```
+
+          Chaque appel récupère une seule page. Le paramètre `page` permet de consulter
+          les suivantes ; cette route ne déclenche ni collecte automatique de toutes
+          les pages, ni enrichissement par le détail d'un film, ni stockage SQLite.
         size: M
         priority: P2
         dependsOn: []
         acceptance:
-          - L'API discover est consommée pour récupérer les films d'une année donnée.
-          - Les films récupérés sont exposés via une API interne.
+          - La route `GET /api/discover/movies` transmet `year` à l'API TMDB `GET /3/discover/movie` avec le filtre `primary_release_year`.
+          - Le paramètre `year` est une chaîne de quatre chiffres comprise entre 1000 et 9999 ; une valeur absente ou invalide renvoie HTTP 400 avec un message explicite, sans appel à TMDB.
+          - Les valeurs non vides de `language`, `page` et `region` fournies comme chaînes sont transmises à TMDB ; sinon les valeurs par défaut sont respectivement `fr-FR`, `1` et `FR`.
+          - L'appel TMDB utilise le jeton d'accès configuré côté serveur, sans l'exposer dans la réponse.
+          - La réponse conserve les champs `page`, `results`, `total_pages` et `total_results` ; chaque film est converti au format supporté par `movies-api`, sans les propriétés `adult` et `video`.
+          - Une réponse sans films est renvoyée avec une liste `results` vide et les informations de pagination fournies par TMDB.
+          - Un échec HTTP TMDB, réseau ou de lecture JSON est journalisé côté serveur et renvoie HTTP 500 avec le message `Failed to discover movies`.
         definitionOfDone:
-          - L'intégration avec l'API discover est implémentée.
-          - Des tests couvrent la récupération et l'exposition des films.
+          - Le module Discover est implémenté en TypeScript et sa route est enregistrée dans le serveur Express existant.
+          - Des tests avec l'appel TMDB simulé couvrent le filtre d'année, les options par défaut et personnalisées, la conversion des films et une réponse vide.
+          - Des tests couvrent les années absentes ou invalides, y compris les valeurs multiples ou structurées, et vérifient qu'aucun appel TMDB n'est effectué.
+          - Des tests couvrent les erreurs HTTP, réseau et JSON, leurs réponses HTTP 500 et leur journalisation.
+          - L'enregistrement de la route est testé et les paramètres, la pagination et les erreurs sont documentés.
       - id: DASHBOARD-08
         key: DASHBOARD-08
         type: feature
