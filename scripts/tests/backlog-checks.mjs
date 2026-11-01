@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { parse } from 'yaml';
 import {
   instantiate,
+  ensureViewSorting,
   issueBody,
   marker,
   parseOptions,
@@ -47,6 +48,187 @@ const config = {
   })),
 };
 delete config.project.backlogColumns;
+
+function titleSort() {
+  return { nodes: [{ field: { id: 'title' }, direction: 'ASC' }] };
+}
+
+test('viewSort defaults to ascending Title and validates explicit configuration', () => {
+  assert.deepEqual(configuredBacklog.project.viewSort, {
+    field: 'Title',
+    direction: 'asc',
+  });
+  const legacy = structuredClone(config);
+  delete legacy.project.viewSort;
+  validateBacklog(legacy);
+  const logs = [];
+  instantiate(
+    legacy,
+    { repo: 'movies' },
+    () => assert.fail('No GitHub calls'),
+    (line) => logs.push(line),
+  );
+  assert.ok(logs.some((line) => line.includes('Title (asc)')));
+  for (const sort of [
+    null,
+    {},
+    { field: '', direction: 'asc' },
+    { field: ' Title', direction: 'asc' },
+    { field: 'Title', direction: 'ascending' },
+    { field: 42, direction: 'desc' },
+  ]) {
+    const invalid = structuredClone(config);
+    invalid.project.viewSort = sort;
+    assert.throws(() => validateBacklog(invalid), /viewSort/);
+  }
+  legacy.project.viewSort = { field: 'Priority', direction: 'desc' };
+  validateBacklog(legacy);
+});
+
+test('view sorting creates sorted views for both owner types and preserves existing views', () => {
+  for (const type of ['User', 'Organization']) {
+    const views = [
+      { id: 'custom', name: 'Custom', sortByFields: { nodes: [] } },
+      { id: 'backlog', name: 'Backlog', sortByFields: titleSort() },
+      { id: 'features', name: 'Features', sortByFields: { nodes: [] } },
+    ];
+    const original = structuredClone(views);
+    const logs = [];
+    const creations = [];
+    let queries = 0;
+    const run = (args, input) => {
+      if (args[1] === 'graphql') {
+        const { variables } = JSON.parse(input);
+        queries++;
+        return JSON.stringify({
+          data: {
+            node: {
+              views: {
+                nodes: variables.cursor ? views.slice(1) : views.slice(0, 1),
+                pageInfo: { hasNextPage: !variables.cursor, endCursor: 'next' },
+              },
+            },
+          },
+        });
+      }
+      if (args[1] === 'users/student') return JSON.stringify({ id: 42, type });
+      const endpoint = type === 'User' ? 'users/42' : 'orgs/student';
+      assert.ok(args[1].startsWith(`${endpoint}/projectsV2/7/`));
+      assert.ok(args.includes('X-GitHub-Api-Version: 2026-03-10'));
+      if (args[1].includes('/fields?')) {
+        assert.ok(args.includes('--paginate') && args.includes('--slurp'));
+        return JSON.stringify([[], [{ id: 123, node_id: 'title' }]]);
+      }
+      assert.ok(args[1].endsWith('/views') && args.includes('POST'));
+      const payload = JSON.parse(input);
+      creations.push(payload);
+      return JSON.stringify({
+        node_id: payload.name,
+        name: payload.name,
+        sort_by: payload.sort_by,
+      });
+    };
+    ensureViewSorting(
+      run,
+      { id: 'project', number: 7 },
+      'student',
+      [{ id: 'title', name: 'Title' }],
+      ['Backlog', 'Features', 'Bugs', 'Backlog backend', 'Backlog frontend'],
+      { field: 'Title', direction: 'asc' },
+      (line) => logs.push(line),
+    );
+    assert.equal(queries, 2);
+    assert.deepEqual(views, original);
+    assert.deepEqual(
+      creations,
+      ['Bugs', 'Backlog backend', 'Backlog frontend'].map((name) => ({
+        name,
+        layout: 'table',
+        sort_by: [[123, 'asc']],
+      })),
+    );
+    assert.equal(
+      logs.filter((line) => line.includes('manuellement')).length,
+      1,
+    );
+    assert.ok(logs.some((line) => line.includes('Tri de Features')));
+    assert.ok(!logs.some((line) => line.includes('Tri de Backlog ')));
+  }
+});
+
+test('view sorting supports descending custom fields and surfaces failures', () => {
+  const fields = [{ id: 'priority', name: 'Priority' }];
+  const sort = { field: 'Priority', direction: 'desc' };
+  const project = { id: 'project', number: 7 };
+  const run = (args, input) => {
+    if (args[1] === 'graphql')
+      return JSON.stringify({
+        data: {
+          node: { views: { nodes: [], pageInfo: { hasNextPage: false } } },
+        },
+      });
+    if (args[1] === 'users/student')
+      return JSON.stringify({ id: 42, type: 'User' });
+    if (args[1].includes('/fields?'))
+      return JSON.stringify([[{ id: 9, node_id: 'priority' }]]);
+    const payload = JSON.parse(input);
+    assert.deepEqual(payload.sort_by, [[9, 'desc']]);
+    return JSON.stringify({
+      node_id: 'view',
+      name: payload.name,
+      sort_by: payload.sort_by,
+    });
+  };
+  ensureViewSorting(
+    run,
+    project,
+    'student',
+    fields,
+    ['Backlog'],
+    sort,
+    () => {},
+  );
+  assert.throws(
+    () =>
+      ensureViewSorting(
+        () => assert.fail('No GitHub calls'),
+        project,
+        'student',
+        fields,
+        ['Backlog'],
+        { field: 'Missing', direction: 'asc' },
+        () => {},
+      ),
+    /Champ de tri inconnu/,
+  );
+  for (const failure of ['api', 'fields', 'sort']) {
+    const failing = (args, input) => {
+      if (failure === 'api' && args[1].endsWith('/views'))
+        throw new Error('REST forbidden');
+      if (failure === 'fields' && args[1].includes('/fields?')) return '[[]]';
+      if (failure === 'sort' && args[1].endsWith('/views'))
+        return JSON.stringify({
+          node_id: 'view',
+          name: 'Backlog',
+          sort_by: [],
+        });
+      return run(args, input);
+    };
+    assert.throws(
+      () =>
+        ensureViewSorting(
+          failing,
+          project,
+          'student',
+          fields,
+          ['Backlog'],
+          sort,
+          () => {},
+        ),
+      /REST forbidden|Identifiant REST|sans le tri attendu/,
+    );
+  }
+});
 
 test('backlog accepts a growing set of ideas with unique tickets', () => {
   validateBacklog(configuredBacklog);
@@ -510,9 +692,9 @@ test('scope supports backend/frontend and remains optional for older configurati
       .filter(({ args }) => args[1] === 'graphql')
       .map(({ input }) => JSON.parse(input));
     assert.deepEqual(
-      viewWrites
-        .filter(({ query }) => query.includes('createProjectV2View'))
-        .map(({ variables }) => variables.name),
+      f.calls
+        .filter(({ args }) => args[1].endsWith('/views'))
+        .map(({ input }) => JSON.parse(input).name),
       ['Backlog backend', 'Backlog frontend'],
     );
     assert.deepEqual(
@@ -836,6 +1018,33 @@ function fixture({
     if (command === 'auth status' || command === 'project link') return '';
     if (args[0] === 'api' && args[1] === 'user')
       return JSON.stringify({ login: 'student' });
+    if (args[0] === 'api' && args[1] === 'users/student')
+      return JSON.stringify({ id: 42, type: 'User' });
+    if (args[0] === 'api' && args[1].includes('/fields?'))
+      return JSON.stringify([
+        fields.map((field, index) => ({
+          id: index + 1,
+          node_id: field.id,
+          name: field.name,
+        })),
+      ]);
+    if (args[0] === 'api' && args[1].endsWith('/views')) {
+      const payload = JSON.parse(input);
+      const view = {
+        id: payload.name,
+        name: payload.name,
+        number: extraViews.length + 4,
+        filter: '',
+        sortByFields: titleSort(),
+        configuration: { visibleFields: { nodes: [{ id: 'title' }] } },
+      };
+      extraViews.push(view);
+      return JSON.stringify({
+        node_id: view.id,
+        name: view.name,
+        sort_by: payload.sort_by,
+      });
+    }
     if (command === 'repo view')
       return JSON.stringify({
         hasIssuesEnabled: true,
@@ -976,9 +1185,17 @@ function fixture({
             node: {
               views: {
                 nodes: [
-                  { id: 'view', name: 'Backlog', number: 1 },
+                  {
+                    id: 'view',
+                    name: 'Backlog',
+                    number: 1,
+                    sortByFields: titleSort(),
+                  },
                   ...extraViews,
-                  ...typeViews,
+                  ...typeViews.map((view) => ({
+                    ...view,
+                    sortByFields: titleSort(),
+                  })),
                 ],
                 pageInfo: { hasNextPage: false },
               },
@@ -1159,9 +1376,9 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
     .filter(({ args }) => args[1] === 'graphql')
     .map(({ input }) => JSON.parse(input));
   assert.deepEqual(
-    viewWrites
-      .filter(({ query }) => query.includes('createProjectV2View'))
-      .map(({ variables }) => variables.name),
+    f.calls
+      .filter(({ args }) => args[1].endsWith('/views'))
+      .map(({ input }) => JSON.parse(input).name),
     ['Backlog backend', 'Backlog frontend'],
   );
   assert.deepEqual(
@@ -1178,7 +1395,11 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
           variables.fields?.join(',') === 'title,scope,status',
       ),
     );
-  assert.ok(!f.calls.some(({ args }) => args.includes('POST')));
+  assert.ok(
+    f.calls
+      .filter(({ args }) => args.includes('POST'))
+      .every(({ args }) => args[1].endsWith('/views')),
+  );
   assert.equal(parseOptions(['--repo', 'movies'])['create-issues'], false);
   assert.throws(
     () =>
@@ -1981,7 +2202,12 @@ test('existing feature labels are preserved regardless of case', () => {
 
 test('default view is renamed to configured Backlog once, without altering its layout', () => {
   const { small, run, options } = fixture({ existing: true });
-  const view = { id: 'view', name: 'View 1', number: 1 };
+  const view = {
+    id: 'view',
+    name: 'View 1',
+    number: 1,
+    sortByFields: titleSort(),
+  };
   const updates = [];
   function withDefaultView(args, input) {
     if (args[1] === 'graphql') {
@@ -2005,7 +2231,10 @@ test('default view is renamed to configured Backlog once, without altering its l
             },
           },
         });
-      if (query.includes('updateProjectV2View')) {
+      if (
+        query.includes('updateProjectV2View') &&
+        variables.name !== undefined
+      ) {
         assert.deepEqual(variables, { id: 'view', name: 'Backlog' });
         assert.ok(!query.includes('layout:'));
         view.name = variables.name;
@@ -2031,6 +2260,24 @@ test('custom views are preserved and only the missing Backlog view is created', 
   const original = structuredClone(views);
   const createdNames = [];
   function withCustomView(args, input) {
+    if (args[1].endsWith('/views')) {
+      const payload = JSON.parse(input);
+      assert.equal(payload.name, 'Backlog');
+      assert.equal(payload.layout, 'table');
+      const view = {
+        id: 'new-view',
+        name: payload.name,
+        number: 3,
+        sortByFields: titleSort(),
+      };
+      views.push(view);
+      createdNames.push(payload.name);
+      return JSON.stringify({
+        node_id: view.id,
+        name: view.name,
+        sort_by: payload.sort_by,
+      });
+    }
     if (args[1] === 'graphql') {
       const { query, variables } = JSON.parse(input);
       if (query.includes('visibleFields(first: 100)')) return run(args, input);
@@ -2041,11 +2288,9 @@ test('custom views are preserved and only the missing Backlog view is created', 
               views: {
                 nodes: [
                   ...views,
-                  ...(createdNames.length
-                    ? JSON.parse(run(args, input)).data.node.views.nodes.filter(
-                        (candidate) => candidate.name !== 'Backlog',
-                      )
-                    : []),
+                  ...JSON.parse(run(args, input)).data.node.views.nodes.filter(
+                    (candidate) => candidate.name !== 'Backlog',
+                  ),
                 ],
                 pageInfo: { hasNextPage: false },
               },
@@ -2290,10 +2535,35 @@ test('mixed feature and bug tickets receive native types or personal labels', ()
 test('Features and Bugs views are created and filtered once for each repository kind', () => {
   for (const personalRepo of [false, true]) {
     const { small, run, options } = fixture({ existing: true });
-    const views = [{ id: 'view', name: 'Backlog', number: 1, filter: '' }];
+    const views = [
+      {
+        id: 'view',
+        name: 'Backlog',
+        number: 1,
+        filter: '',
+        sortByFields: titleSort(),
+      },
+    ];
     const filters = [];
     let creations = 0;
     function filtered(args, input) {
+      if (args[1].endsWith('/views')) {
+        const payload = JSON.parse(input);
+        const view = {
+          id: payload.name,
+          name: payload.name,
+          number: views.length + 1,
+          filter: '',
+          sortByFields: titleSort(),
+        };
+        views.push(view);
+        creations++;
+        return JSON.stringify({
+          node_id: view.id,
+          name: view.name,
+          sort_by: payload.sort_by,
+        });
+      }
       if (personalRepo && args[1] === 'repos/student/movies')
         return JSON.stringify({ owner: { type: 'User' } });
       if (args[1].includes('/labels?'))

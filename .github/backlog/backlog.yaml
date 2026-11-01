@@ -5,6 +5,9 @@ milestones:
 project:
   title: TMDB - Backlog
   viewName: Backlog
+  viewSort:
+    field: Title
+    direction: asc
   backlogColumns:
     - Title
     - Epic
@@ -97,14 +100,15 @@ epics:
           En tant que développeur, je veux traduire la spécification DASHBOARD-01 en
           schéma SQLite pour stocker les films, leurs genres et leurs pays sans doublons.
 
-          Un CLI est fourni pour interagir avec la base de données SQLite. Le package `commander` est utilisé pour gérer les options et les commandes du CLI.
+          Le schéma s'appuie sur ce qui a été défini dans DASHBOARD-01. Il est initialisé avec `node:sqlite`.
 
-          Un lancement du CLI sans option crée et initialise la base de données par défaut.
+          Un CLI utilisant `commander` permet de créer et d'initialiser la base de données.
+          Sans option, il utilise le fichier par défaut :
           ```sh
           node src/back-end/backend-cli.ts
           ```
 
-          Pour choisir un autre fichier SQLite :
+          L'option `--path` permet de choisir un autre fichier SQLite :
 
           ```sh
           node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite
@@ -115,13 +119,15 @@ epics:
         milestone: 2.0.0
         dependsOn: [DASHBOARD-01]
         acceptance:
-          - Le schéma SQLite reflète fidèlement le MCD défini dans DASHBOARD-01 et permet de stocker les films, leurs genres et leurs pays sans doublons.
-          - Le schéma est instancié en typescript grâce à 'node:sqlite' et peut être manipulé via un CLI.
-          - Le CLI permet d'exécuter les commandes nécessaires pour créer et gérer la base de données SQLite à partir du schéma défini.
+          - Le schéma SQLite contient les tables et relations définies dans DASHBOARD-01.
+          - Les associations sont uniques et les clés étrangères garantissent la cohérence entre les tables liées.
+          - L'année de sortie est calculée et stockée à partir de la date de sortie ; les durées, budgets et recettes renseignés doivent être positifs.
+          - Le schéma est initialisé avec `node:sqlite` dans une transaction ; une erreur d'initialisation est propagée et annule les changements.
+          - Le CLI crée et initialise la base de données par défaut sans option, et accepte `--path` pour sélectionner un autre fichier.
         definitionOfDone:
-          - Le schéma est instancié en typescript grâce à 'node:sqlite' et peut être manipulé via un CLI.
-          - Le CLI permet d'exécuter les commandes nécessaires pour créer et gérer la base de données SQLite à partir du schéma défini.
-          - La base de données peut être initialisée et manipulée via le CLI avec un chemin configurable.
+          - Le schéma SQLite et le CLI d'initialisation sont implémentés en TypeScript avec `node:sqlite` et `commander`.
+          - Des tests couvrent la création du schéma, les contraintes d'intégrité et l'annulation en cas d'échec d'initialisation.
+          - Des tests vérifient l'initialisation du CLI avec le chemin par défaut et avec un chemin fourni via `--path`.
       - id: DASHBOARD-03
         key: EXPL-GENRES
         type: feature
@@ -146,7 +152,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
         size: M
-        priority: P3
+        priority: P2
         dependsOn: [DASHBOARD-03]
         acceptance:
           - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
@@ -176,8 +182,8 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
         size: M
-        priority: P3
-        dependsOn: [DASHBOARD-02]
+        priority: P2
+        dependsOn: [DASHBOARD-05]
         acceptance:
           - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
         definitionOfDone:
@@ -485,7 +491,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux voir tous les widgets intégrés dans le tableau de bord afin d'avoir une vue complète des indicateurs.
         size: M
-        priority: P2
+        priority: P3
         dependsOn: [DASHBOARD-24]
         acceptance:
           - Tous les widgets existants sont visibles et correctement disposés dans le tableau de bord.

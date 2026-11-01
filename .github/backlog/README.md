@@ -251,6 +251,25 @@ Backlog dans GitHub, la grouper par **Status**, puis afficher Size, Epic et
 Priority. Le script ne modifie pas les filtres ou regroupements ; il ajoute
 uniquement Epic et Size aux colonnes visibles si nécessaire.
 
+Le tri des vues gérées par le générateur (Backlog, Backlog backend/frontend et
+Features/Bugs en mode issues) est configurable avec `project.viewSort` :
+
+```yaml
+project:
+  viewSort:
+    field: Title
+    direction: asc
+```
+
+Sans cette option, le tri par défaut est **Title en ordre croissant**.
+`field` désigne un champ GitHub existant ; `direction` accepte `asc` ou `desc`.
+Un champ inconnu provoque une erreur explicite. Le tri est enregistré à la
+création des nouvelles vues via l'API REST GitHub. L'API ne permet pas de modifier
+le tri des vues existantes : elles sont conservées, y compris la vue initiale
+« View 1 » renommée, et le script signale les écarts à ajuster manuellement
+dans GitHub. Les vues personnalisées ne sont pas modifiées. La simulation
+affiche le tri souhaité sans aucune requête GitHub.
+
 ### Reprendre un import ou utiliser un projet existant
 
 Pour synchroniser aussi les valeurs existantes à partir du YAML, utiliser
