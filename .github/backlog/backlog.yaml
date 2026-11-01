@@ -136,28 +136,62 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres
           afin de maintenir une liste de genres cohérente et à jour.
+
+          Un module dédié **genre-repository** expose la recherche par identifiant, la liste des genres et
+          l'insertion ou l'actualisation de leurs libellés. Un genre est représenté
+          par un identifiant numérique `id` et un nom `name`.
         size: M
         priority: P1
         dependsOn: [DASHBOARD-02]
         acceptance:
-          - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés.
+          - La recherche par identifiant renvoie le genre correspondant ou `undefined` si aucun genre n'existe.
+          - La liste renvoie les genres triés par identifiant croissant.
+          - L'insertion ou la mise à jour accepte un itérable de genres ; un identifiant existant entraîne la mise à jour du nom sans créer de doublon.
+          - Un itérable vide ne modifie pas les données ; si un identifiant apparaît plusieurs fois, le dernier libellé fourni est conservé.
         definitionOfDone:
-          - Le module dédié aux genres est implémenté.
-          - Des test unitaires couvrent la recherche, l'insertion et la mise à jour des genres.
+          - Le module de gestion des genres est implémenté en TypeScript avec `node:sqlite` et utilise le type `Genre`.
+          - Des tests unitaires sur une base SQLite en mémoire couvrent la recherche d'un genre présent ou absent, la liste, l'insertion et la mise à jour sans doublon.
+          - Des tests couvrent les tableaux et autres itérables, l'entrée vide, les identifiants répétés et la contrainte de nom obligatoire.
       - id: DASHBOARD-04
         key: EXPL-GENRES-CSV
         type: feature
         scope: backend
-        title: Importer et mettre à jour les genres à partir d'un fichier CSV
+        title: Importer les genres depuis un CSV et nettoyer les genres inutilisés
         story: |
-          En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
+          En tant que gestionnaire de la base de données des films, je veux importer
+          ou actualiser les genres depuis un fichier CSV et supprimer les genres
+          inutilisés afin de maintenir un catalogue cohérent.
+
+          Le CSV contient exactement les colonnes `id` et `name`. La commande
+          `add-genres` utilise le module de gestion des genres de DASHBOARD-03 :
+
+          ```sh
+          node src/back-end/backend-cli.ts add-genres ./data/genres.csv
+          node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite add-genres ./data/genres.csv
+          ```
+
+          La commande `clean-genres` supprime uniquement les genres sans association
+          à un film et accepte également le chemin configurable de la base :
+
+          ```sh
+          node src/back-end/backend-cli.ts clean-genres
+          ```
         size: M
         priority: P2
         dependsOn: [DASHBOARD-03]
         acceptance:
-          - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
+          - Le parseur CSV accepte exactement les en-têtes `id` et `name`, dans n'importe quel ordre et sans distinction de casse.
+          - Les fins de ligne LF et CRLF, le BOM UTF-8, les virgules dans les champs entre guillemets et les guillemets échappés sont pris en charge ; les lignes vides sont ignorées.
+          - Les identifiants sont des entiers positifs représentables sans perte de précision et les noms sont non vides ; les en-têtes, valeurs et syntaxes CSV invalides provoquent une erreur explicite.
+          - La commande `add-genres <csv-file>` insère ou actualise les genres dans la base par défaut ou celle sélectionnée par `--path`, sans créer de doublons.
+          - Le CSV est validé avant l'ouverture de la base ; l'import est transactionnel, annulé en cas d'échec et l'erreur est propagée.
+          - La commande `clean-genres` supprime uniquement les genres absents de `movie_genres` et conserve les genres associés à un film.
+          - Les commandes ferment la connexion SQLite et affichent le nombre de genres importés ou supprimés ainsi que le chemin de la base.
         definitionOfDone:
-          - Le module dédié aux genres est implémenté pour gérer l'importation depuis un fichier CSV.
+          - Le parseur CSV est implémenté avec `csv-parse/sync` et les commandes `add-genres` et `clean-genres` sont intégrées au CLI existant.
+          - Des tests unitaires couvrent les formats CSV acceptés, les lignes vides, les valeurs invalides et les guillemets mal formés.
+          - Des tests du CLI couvrent l'import dans une base sélectionnée, la transaction, le nettoyage limité aux genres inutilisés, la fermeture de la connexion et les messages de résultat.
+          - Un fichier d'exemple `data/genres.csv` est fourni et les commandes d'import et de nettoyage sont documentées.
       - id: DASHBOARD-05
         key: EXPL-COUNTRIES-CSV
         type: feature
