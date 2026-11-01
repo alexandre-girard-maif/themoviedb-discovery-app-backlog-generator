@@ -82,6 +82,7 @@ epics:
 
           Retrouver un film déjà collecté doit permettre d'actualiser sa description, ses genres, ses pays et la date de l'observation, sans créer un doublon ni retirer les films des autres années. Ces informations doivent rester cohérentes entre elles.
         size: S
+        category: exclu
         priority: P1
         milestone: 2.0.0
         dependsOn: []
@@ -116,6 +117,7 @@ epics:
           ```
 
         size: M
+        category: exclu
         priority: P1
         milestone: 2.0.0
         dependsOn: [DASHBOARD-01]
@@ -142,6 +144,7 @@ epics:
           l'insertion ou l'actualisation de leurs libellés. Un genre est représenté
           par un identifiant numérique `id` et un nom `name`.
         size: M
+        category: socle
         priority: P1
         dependsOn: [DASHBOARD-02]
         acceptance:
@@ -178,6 +181,7 @@ epics:
           node src/back-end/backend-cli.ts clean-genres
           ```
         size: M
+        category: approfondissement
         priority: P2
         dependsOn: [DASHBOARD-03]
         acceptance:
@@ -206,6 +210,7 @@ epics:
           l'insertion ou l'actualisation de leurs libellés. Un pays est représenté
           par un code `code` et un nom `name`.
         size: M
+        category: socle
         priority: P1
         dependsOn: [DASHBOARD-02]
         acceptance:
@@ -244,6 +249,7 @@ epics:
           node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite clean-countries
           ```
         size: M
+        category: exclu
         priority: P2
         dependsOn: [DASHBOARD-05]
         acceptance:
@@ -282,6 +288,7 @@ epics:
           les suivantes ; cette route ne déclenche ni collecte automatique de toutes
           les pages, ni enrichissement par le détail d'un film, ni stockage SQLite.
         size: M
+        category: socle
         priority: P2
         dependsOn: []
         acceptance:
@@ -306,6 +313,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les films afin de maintenir une liste de films cohérente et à jour.
         size: M
+        category: socle
         priority: P3
         dependsOn: []
         acceptance:
@@ -321,6 +329,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir importer et mettre à jour les films à partir d'un fichier CSV afin de maintenir une liste de films cohérente et à jour.
         size: M
+        category: exclu
         priority: P3
         dependsOn: []
         acceptance:
@@ -336,6 +345,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir mettre à jour les films, genres et pays à partir des APIs mises en place afin de maintenir une liste de films cohérente et à jour.
         size: L
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-03, DASHBOARD-05, DASHBOARD-08]
         acceptance:
@@ -351,6 +361,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux pouvoir accéder à la page de tableau de bord des films même si aucun widget n'est encore configuré afin de visualiser les informations de base.
         size: M
+        category: exclu
         priority: P3
         dependsOn: []
         acceptance:
@@ -366,6 +377,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux pouvoir visualiser les futurs widgets et leurs différents états dans le storybook afin de faciliter le développement et la validation des composants.
         size: S
+        category: exclu
         priority: P3
         dependsOn: []
         acceptance:
@@ -381,6 +393,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux pouvoir voir le widget "Films en base" sur la page de tableau de bord des films afin d'accéder rapidement aux informations sur les films disponibles.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -397,6 +410,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux consulter la durée moyenne des films du catalogue pour comprendre leur format.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -414,6 +428,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux consulter la note moyenne des films pour apprécier la qualité du catalogue.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -431,6 +446,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le pays le plus représenté et le nombre de films associés pour situer l'origine du catalogue.
         size: S
+        category: exclu
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -448,6 +464,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film le mieux noté pour découvrir un titre apprécié.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -465,6 +482,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film le plus populaire pour découvrir le titre qui suscite le plus d'intérêt.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -482,6 +500,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film présentant le meilleur retour sur investissement pour comparer sa rentabilité.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -500,6 +519,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film présentant le plus faible retour sur investissement pour repérer les pertes.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -517,6 +537,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux connaître le nombre de genres représentés pour apprécier la diversité du catalogue.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -534,6 +555,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le genre le plus présent et son effectif pour comprendre la tendance du catalogue.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -551,6 +573,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux connaître le genre ayant la meilleure note moyenne pour comparer les genres du catalogue.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -568,6 +591,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux connaître le genre ayant la meilleure note pondérée afin de disposer d'un indicateur distinct de la moyenne simple.
         size: S
+        category: exclu
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -581,10 +605,11 @@ epics:
         key: DASHBOARD-25
         type: feature
         scope: frontend
-        title: Intégrer l'ensemble des widgets dans le tableau de bord
+        title: Intégrer les widgets dans le tableau de bord
         story: |
           En tant qu'utilisateur, je veux voir tous les widgets intégrés dans le tableau de bord afin d'avoir une vue complète des indicateurs.
         size: M
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-24]
         acceptance:
