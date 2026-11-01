@@ -12,8 +12,9 @@ project:
     - Title
     - Epic
     - Size
-    - scope
+    - Scope
     - Priority
+    - Category
     - dependsOn
     - Status
   typeViews:

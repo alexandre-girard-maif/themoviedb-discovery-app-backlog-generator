@@ -11,6 +11,12 @@ const defaultConfig = new URL(
   import.meta.url,
 );
 const fieldNames = ['Size', 'Epic', 'Priority'];
+const categoryFieldName = 'Category';
+const categoryPalette = [
+  { name: 'socle', color: 'GREEN' },
+  { name: 'approfondissement', color: 'BLUE' },
+  { name: 'exclu', color: 'GRAY' },
+];
 const priorityPalette = [
   { name: 'P1', color: 'RED' },
   { name: 'P2', color: 'ORANGE' },
@@ -197,6 +203,11 @@ export function validateBacklog(config) {
         ticket.scope === undefined ||
           ['backend', 'frontend'].includes(ticket.scope),
         `${ticket.id} : scope doit etre backend ou frontend.`,
+      );
+      requireValue(
+        ticket.category === undefined ||
+          categoryPalette.some((category) => category.name === ticket.category),
+        `${ticket.id} : category doit etre socle, approfondissement ou exclu.`,
       );
       requireValue(
         config.sizes.some((size) => size.name === ticket.size),
@@ -1199,7 +1210,10 @@ function instantiateDrafts(config, options, run, log, project) {
       Epic: epic.id,
       Priority: ticket.priority,
       Size: ticket.size,
-      ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
+      ...(ticket.scope !== undefined ? { Scope: ticket.scope } : {}),
+      ...(ticket.category !== undefined
+        ? { [categoryFieldName]: ticket.category }
+        : {}),
     })) {
       if (
         keepFieldValue(
@@ -1541,13 +1555,55 @@ export function instantiate(config, options, run = gh, log = console.log) {
         'dependsOn doit etre un champ TEXT.',
       );
   }
+  for (const [previousName, name] of [
+    ['scope', 'Scope'],
+    ['Catégorie', categoryFieldName],
+  ]) {
+    const previous = fields.find((field) => field.name === previousName);
+    if (!previous) continue;
+    requireValue(
+      !fields.some((field) => field.name === name),
+      `Les champs ${previousName} et ${name} coexistent : fusionner leurs valeurs avant l'import.`,
+    );
+    requireValue(
+      Array.isArray(previous.options),
+      `Le champ ${previousName} doit etre de type SINGLE_SELECT.`,
+    );
+    graphql(
+      run,
+      `
+        mutation ($id: ID!, $name: String!) {
+          updateProjectV2Field(input: { fieldId: $id, name: $name }) {
+            projectV2Field {
+              ... on ProjectV2SingleSelectField {
+                id
+                name
+              }
+            }
+          }
+        }
+      `,
+      { id: previous.id, name },
+    );
+    previous.name = name;
+    log(`Champ ${previousName} renomme en ${name}.`);
+  }
   const specifications = [
     { name: 'Size', values: config.sizes.map((size) => size.name) },
     { name: 'Epic', values: config.epics.map((epic) => epic.id) },
     { name: 'Priority', values: ['P1', 'P2', 'P3'] },
     ...(allTickets.some((ticket) => ticket.scope !== undefined) ||
-    config.project.backlogColumns?.includes('scope')
-      ? [{ name: 'scope', values: ['backend', 'frontend'] }]
+    config.project.backlogColumns?.includes('Scope')
+      ? [{ name: 'Scope', values: ['backend', 'frontend'] }]
+      : []),
+    ...(allTickets.some((ticket) => ticket.category !== undefined) ||
+    config.project.backlogColumns?.includes(categoryFieldName)
+      ? [
+          {
+            name: categoryFieldName,
+            values: categoryPalette.map((category) => category.name),
+          },
+        ]
       : []),
   ];
   for (const specification of specifications) {
@@ -1598,10 +1654,25 @@ export function instantiate(config, options, run = gh, log = console.log) {
   requireValue(priorityField?.id, 'Champ Priority absent.');
   ensureSelectColors(run, priorityField.id, priorityPalette, 'Priority');
   ensureSelectColors(run, visibleFields[1], epicPalette, 'Epic', true);
-  const scopeField = fields.find((field) => field.name === 'scope');
+  const scopeField = fields.find((field) => field.name === 'Scope');
+  const categoryField = fields.find(
+    (field) => field.name === categoryFieldName,
+  );
+  requireValue(
+    !specifications.some((field) => field.name === categoryFieldName) ||
+      categoryField?.id,
+    `Champ ${categoryFieldName} absent.`,
+  );
+  if (categoryField)
+    ensureSelectColors(
+      run,
+      categoryField.id,
+      categoryPalette,
+      categoryFieldName,
+    );
   requireValue(
     !allTickets.some((ticket) => ticket.scope !== undefined) || scopeField?.id,
-    'Champ scope absent.',
+    'Champ Scope absent.',
   );
   if (allTickets.some((ticket) => ticket.scope !== undefined))
     ensureSelectColors(
@@ -1611,7 +1682,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
         { name: 'backend', color: 'BLUE' },
         { name: 'frontend', color: 'PURPLE' },
       ],
-      'scope',
+      'Scope',
     );
   const backlogColumns = config.project.backlogColumns
     ? config.project.backlogColumns.map((name) => {
@@ -1619,9 +1690,13 @@ export function instantiate(config, options, run = gh, log = console.log) {
         requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
         return field.id;
       })
-    : allTickets.some((ticket) => ticket.scope !== undefined)
-      ? [...visibleFields, scopeField.id]
-      : visibleFields;
+    : [
+        ...visibleFields,
+        ...(allTickets.some((ticket) => ticket.scope !== undefined)
+          ? [scopeField.id]
+          : []),
+        ...(categoryField ? [categoryField.id] : []),
+      ];
   ensureViewSorting(
     run,
     project,
@@ -1650,7 +1725,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
       project.id,
       ['backend', 'frontend'].map((scope) => ({
         name: `Backlog ${scope}`,
-        filter: `scope:${scope}`,
+        filter: `Scope:${scope}`,
       })),
       backlogColumns,
       log,
@@ -1828,12 +1903,16 @@ export function instantiate(config, options, run = gh, log = console.log) {
       Size: ticket.size,
       Epic: epic.id,
       Priority: ticket.priority,
-      ...(ticket.scope !== undefined ? { scope: ticket.scope } : {}),
+      ...(ticket.scope !== undefined ? { Scope: ticket.scope } : {}),
+      ...(ticket.category !== undefined
+        ? { [categoryFieldName]: ticket.category }
+        : {}),
     };
     for (const name of [
       'Status',
       ...fieldNames,
-      ...(ticket.scope !== undefined ? ['scope'] : []),
+      ...(ticket.scope !== undefined ? ['Scope'] : []),
+      ...(ticket.category !== undefined ? [categoryFieldName] : []),
     ]) {
       if (
         keepFieldValue(

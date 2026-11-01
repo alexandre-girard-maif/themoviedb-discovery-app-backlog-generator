@@ -85,6 +85,59 @@ test('viewSort defaults to ascending Title and validates explicit configuration'
   validateBacklog(legacy);
 });
 
+test('legacy field names are renamed without recreating fields or changing option IDs', () => {
+  const f = fixture({ existing: true, scope: 'backend' });
+  const field = {
+    id: 'category',
+    name: 'Catégorie',
+    options: ['socle', 'approfondissement', 'exclu'].map((name, index) => ({
+      id: name,
+      name,
+      color: ['GREEN', 'BLUE', 'GRAY'][index],
+      description: '',
+    })),
+  };
+  let scopeName = 'scope';
+  const renames = [];
+  const run = (args, input) => {
+    if (args[1] === 'field-list') {
+      const result = JSON.parse(f.run(args, input));
+      result.fields.find((candidate) => candidate.id === 'scope').name =
+        scopeName;
+      result.fields.push(field);
+      return JSON.stringify(result);
+    }
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (query.includes('updateProjectV2Field') && variables.name) {
+        renames.push(variables);
+        if (variables.id === 'scope') scopeName = variables.name;
+        else field.name = variables.name;
+        return JSON.stringify({ data: { updateProjectV2Field: {} } });
+      }
+      if (variables.id === 'category')
+        return JSON.stringify({ data: { node: { options: field.options } } });
+    }
+    assert.ok(
+      !(
+        args[1] === 'field-create' &&
+        (args.includes('Scope') || args.includes('Category'))
+      ),
+    );
+    return f.run(args, input);
+  };
+  instantiate(f.small, f.options, run, () => {});
+  instantiate(f.small, f.options, run, () => {});
+  assert.deepEqual(renames, [
+    { id: 'scope', name: 'Scope' },
+    { id: 'category', name: 'Category' },
+  ]);
+  assert.deepEqual(
+    field.options.map((option) => option.id),
+    ['socle', 'approfondissement', 'exclu'],
+  );
+});
+
 test('view sorting creates sorted views for both owner types and preserves existing views', () => {
   for (const type of ['User', 'Organization']) {
     const views = [
@@ -634,7 +687,7 @@ test('scope supports backend/frontend and remains optional for older configurati
     f.small.epics[0].tickets[0].scope = scope;
     const field = {
       id: 'scope',
-      name: 'scope',
+      name: 'Scope',
       options: [
         { id: 'backend', name: 'backend', color: 'GRAY', description: 'API' },
         { id: 'frontend', name: 'frontend', color: 'GRAY', description: 'UI' },
@@ -701,7 +754,7 @@ test('scope supports backend/frontend and remains optional for older configurati
       viewWrites
         .filter(({ variables }) => variables.filter !== undefined)
         .map(({ variables }) => variables.filter),
-      ['scope:backend', 'scope:frontend'],
+      ['Scope:backend', 'Scope:frontend'],
     );
     for (const viewName of ['Backlog backend', 'Backlog frontend'])
       assert.ok(
@@ -716,6 +769,186 @@ test('scope supports backend/frontend and remains optional for older configurati
     const invalid = structuredClone(config);
     invalid.epics[0].tickets[0].scope = scope;
     assert.throws(() => validateBacklog(invalid), /scope/);
+  }
+});
+
+test('category is optional and accepts only the three grading categories', () => {
+  assert.ok(configuredBacklog.project.backlogColumns.includes('Category'));
+  assert.ok(
+    configuredBacklog.epics
+      .flatMap((epic) => epic.tickets)
+      .every((ticket) => ticket.category === undefined),
+  );
+  for (const category of ['socle', 'approfondissement', 'exclu']) {
+    const valid = structuredClone(config);
+    valid.epics[0].tickets[0].category = category;
+    validateBacklog(valid);
+  }
+  for (const category of ['', null, 42, 'Socle', 'other']) {
+    const invalid = structuredClone(config);
+    invalid.epics[0].tickets[0].category = category;
+    assert.throws(() => validateBacklog(invalid), /category/);
+  }
+});
+
+test('category field is created, colored and displayed in Backlog views without assigning a default', () => {
+  const f = fixture({ existing: true, scope: 'backend' });
+  f.small.project.backlogColumns = ['Title', 'Category', 'Scope'];
+  let field;
+  let creations = 0;
+  let colorChanges = 0;
+  const columns = [];
+  const run = (args, input) => {
+    if (args[1] === 'field-create' && args.includes('Category')) {
+      creations++;
+      assert.ok(args.includes('SINGLE_SELECT'));
+      assert.ok(args.includes('socle,approfondissement,exclu'));
+      field = {
+        id: 'category',
+        name: 'Category',
+        options: [
+          ...['socle', 'approfondissement', 'exclu'].map((name) => ({
+            id: name,
+            name,
+            color: 'GRAY',
+            description: name,
+          })),
+          { id: 'custom', name: 'custom', color: 'PINK', description: 'keep' },
+        ],
+      };
+      return '';
+    }
+    if (args[1] === 'field-list') {
+      const data = JSON.parse(f.run(args, input));
+      if (field) data.fields.push(field);
+      return JSON.stringify(data);
+    }
+    if (args[1] === 'graphql') {
+      const { query, variables } = JSON.parse(input);
+      if (variables.id === 'category') {
+        if (query.includes('updateProjectV2Field')) {
+          field.options = variables.options;
+          colorChanges++;
+          return JSON.stringify({ data: { updateProjectV2Field: {} } });
+        }
+        return JSON.stringify({ data: { node: { options: field.options } } });
+      }
+      if (variables.fields) columns.push(variables);
+    }
+    assert.ok(!(args[1] === 'item-edit' && args.includes('category')));
+    return f.run(args, input);
+  };
+  instantiate(f.small, f.options, run, () => {});
+  instantiate(f.small, f.options, run, () => {});
+  assert.equal(creations, 1);
+  assert.equal(colorChanges, 1);
+  assert.deepEqual(
+    field.options.map((option) => option.color),
+    ['GREEN', 'BLUE', 'GRAY', 'PINK'],
+  );
+  assert.deepEqual(
+    field.options.map(({ color: _color, ...option }) => option),
+    [
+      ...['socle', 'approfondissement', 'exclu'].map((name) => ({
+        id: name,
+        name,
+        description: name,
+      })),
+      { id: 'custom', name: 'custom', description: 'keep' },
+    ],
+  );
+  for (const id of ['view', 'Backlog backend', 'Backlog frontend'])
+    assert.ok(
+      columns.some(
+        (view) =>
+          view.id === id && view.fields.join(',') === 'title,category,scope',
+      ),
+    );
+});
+
+test('categories are assigned to issues and drafts, preserved on reruns and overridden only when declared with force-update', () => {
+  for (const drafts of [false, true]) {
+    const f = fixture({ existing: true });
+    const ticket = f.small.epics[0].tickets[0];
+    ticket.category = 'socle';
+    const field = {
+      id: 'category',
+      name: 'Category',
+      options: ['socle', 'approfondissement', 'exclu'].map((name, i) => ({
+        id: name,
+        name,
+        color: ['GREEN', 'BLUE', 'GRAY'][i],
+        description: '',
+      })),
+    };
+    let selected;
+    const edits = [];
+    const run = (args, input) => {
+      if (args[1] === 'repos/student/movies/issues/1' && args.includes('PATCH'))
+        return '{}';
+      if (args[1] === 'field-list') {
+        const data = JSON.parse(f.run(args, input));
+        data.fields.push(field);
+        return JSON.stringify(data);
+      }
+      if (args[1] === 'graphql') {
+        const { query, variables } = JSON.parse(input);
+        if (variables.id === 'category')
+          return JSON.stringify({ data: { node: { options: field.options } } });
+        if (query.includes('items(first:')) {
+          const values = selected
+            ? [{ field: { name: 'Category' }, name: selected }]
+            : [];
+          if (drafts)
+            return JSON.stringify({
+              data: {
+                node: {
+                  items: {
+                    nodes: [
+                      {
+                        id: 'item',
+                        fullDatabaseId: '123',
+                        type: 'DRAFT_ISSUE',
+                        content: {
+                          id: 'draft',
+                          title: `[${ticket.id}] ${ticket.title}`,
+                          body: marker(ticket.id),
+                        },
+                        fieldValues: {
+                          nodes: values,
+                          pageInfo: { hasNextPage: false },
+                        },
+                      },
+                    ],
+                    pageInfo: { hasNextPage: false },
+                  },
+                },
+              },
+            });
+          const data = JSON.parse(f.run(args, input));
+          for (const item of data.data.node.items.nodes)
+            item.fieldValues.nodes.push(...values);
+          return JSON.stringify(data);
+        }
+      }
+      if (args[1] === 'item-edit' && args.includes('category')) {
+        selected = args[args.indexOf('--single-select-option-id') + 1];
+        edits.push(selected);
+        return '';
+      }
+      return f.run(args, input);
+    };
+    const options = { ...f.options, 'create-issues': !drafts };
+    instantiate(f.small, options, run, () => {});
+    assert.deepEqual(edits, ['socle']);
+    ticket.category = 'approfondissement';
+    instantiate(f.small, options, run, () => {});
+    assert.deepEqual(edits, ['socle']);
+    instantiate(f.small, { ...options, 'force-update': true }, run, () => {});
+    assert.deepEqual(edits, ['socle', 'approfondissement']);
+    delete ticket.category;
+    instantiate(f.small, { ...options, 'force-update': true }, run, () => {});
+    assert.deepEqual(edits, ['socle', 'approfondissement']);
   }
 });
 
@@ -993,7 +1226,7 @@ function fixture({
   if (scope !== undefined)
     fields.push({
       id: 'scope',
-      name: 'scope',
+      name: 'Scope',
       options: [
         { id: 'backend', name: 'backend', color: 'BLUE' },
         { id: 'frontend', name: 'frontend', color: 'PURPLE' },
@@ -1315,7 +1548,7 @@ test('apply rejects duplicate projects with the generated title', () => {
 
 test('apply defaults to draft tickets, reuses stable keys and never creates issues', () => {
   const f = fixture({ existing: true, scope: 'frontend' });
-  f.small.project.backlogColumns = ['Title', 'scope', 'Status'];
+  f.small.project.backlogColumns = ['Title', 'Scope', 'Status'];
   const draftOptions = { ...f.options, 'create-issues': false };
   let items = [];
   let creates = 0;
@@ -1362,7 +1595,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
         size: 'Size',
         epic: 'Epic',
         priority: 'Priority',
-        scope: 'scope',
+        scope: 'Scope',
       }[field];
       items[0].fieldValues.nodes.push({ field: { name }, name: 'kept' });
       return '';
@@ -1385,7 +1618,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
     viewWrites
       .filter(({ variables }) => variables.filter !== undefined)
       .map(({ variables }) => variables.filter),
-    ['scope:backend', 'scope:frontend'],
+    ['Scope:backend', 'Scope:frontend'],
   );
   for (const name of ['Backlog backend', 'Backlog frontend'])
     assert.ok(
@@ -1420,7 +1653,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
         size: 'Size',
         epic: 'Epic',
         priority: 'Priority',
-        scope: 'scope',
+        scope: 'Scope',
       }[field];
       assert.ok(name, 'Existing status must be preserved');
       const value = items[0].fieldValues.nodes.find(
@@ -1440,7 +1673,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   ticket.size = 'L';
   ticket.scope = 'backend';
   instantiate(f.small, draftOptions, forceRun, () => {});
-  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Size', 'scope']);
+  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Scope', 'Size']);
   assert.ok(items[0].content.title.includes('Forced title'));
   const count = edits.length;
   instantiate(f.small, draftOptions, forceRun, () => {});
@@ -1449,7 +1682,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   instantiate(f.small, draftOptions, forceRun, () => {});
   assert.equal(edits.length, count);
   assert.equal(
-    items[0].fieldValues.nodes.find((value) => value.field.name === 'scope')
+    items[0].fieldValues.nodes.find((value) => value.field.name === 'Scope')
       .name,
     'backend',
   );
@@ -1471,7 +1704,7 @@ test('force-update synchronizes issue content and declared fields, preserving st
     type: { name: 'Bug' },
     state: 'closed',
   };
-  const nodes = ['Status', 'Size', 'Epic', 'Priority', 'scope', 'Custom'].map(
+  const nodes = ['Status', 'Size', 'Epic', 'Priority', 'Scope', 'Custom'].map(
     (name) => ({
       field: { name },
       name: 'manual',
@@ -1505,7 +1738,7 @@ test('force-update synchronizes issue content and declared fields, preserving st
         size: 'Size',
         epic: 'Epic',
         priority: 'Priority',
-        scope: 'scope',
+        scope: 'Scope',
       }[field];
       assert.ok(name, 'Status and custom fields must not be overwritten');
       nodes.find((entry) => entry.field.name === name).name =
@@ -1517,7 +1750,7 @@ test('force-update synchronizes issue content and declared fields, preserving st
   };
   const options = { ...f.options, 'force-update': true };
   instantiate(f.small, options, run, () => {});
-  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Size', 'scope']);
+  assert.deepEqual(edits.sort(), ['Epic', 'Priority', 'Scope', 'Size']);
   assert.equal(existing.milestone.number, 5);
   assert.equal(existing.type.name, 'Feature');
   assert.equal(existing.title, `[${ticket.id}] ${ticket.title}`);
@@ -1536,7 +1769,7 @@ test('force-update synchronizes issue content and declared fields, preserving st
   instantiate(f.small, options, run, () => {});
   assert.equal(existing.milestone.number, 5);
   assert.equal(
-    nodes.find((entry) => entry.field.name === 'scope').name,
+    nodes.find((entry) => entry.field.name === 'Scope').name,
     'backend',
   );
   assert.equal(edits.length, 4);
