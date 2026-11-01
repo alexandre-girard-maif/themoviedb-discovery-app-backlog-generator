@@ -97,8 +97,7 @@ epics:
           En tant que développeur, je veux traduire la spécification DASHBOARD-01 en
           schéma SQLite pour stocker les films, leurs genres et leurs pays sans doublons.
 
-          Le schéma distingue les films, les genres et les pays de production, et représente
-          leurs associations dans des tables dédiées. Il est initialisé avec `node:sqlite`.
+          Le schéma s'appuie sur ce qui a été défini dans DASHBOARD-01. Il est initialisé avec `node:sqlite`.
 
           Un CLI utilisant `commander` permet de créer et d'initialiser la base de données.
           Sans option, il utilise le fichier par défaut :
@@ -117,8 +116,8 @@ epics:
         milestone: 2.0.0
         dependsOn: [DASHBOARD-01]
         acceptance:
-          - Le schéma SQLite contient les tables des films, genres et pays, ainsi que les tables d'association film-genre et film-pays, conformément à DASHBOARD-01.
-          - Les associations sont uniques et les clés étrangères garantissent la cohérence entre les films, les genres et les pays.
+          - Le schéma SQLite contient les tables et relations définies dans DASHBOARD-01.
+          - Les associations sont uniques et les clés étrangères garantissent la cohérence entre les tables liées.
           - L'année de sortie est calculée et stockée à partir de la date de sortie ; les durées, budgets et recettes renseignés doivent être positifs.
           - Le schéma est initialisé avec `node:sqlite` dans une transaction ; une erreur d'initialisation est propagée et annule les changements.
           - Le CLI crée et initialise la base de données par défaut sans option, et accepte `--path` pour sélectionner un autre fichier.
