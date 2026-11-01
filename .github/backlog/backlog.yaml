@@ -5,6 +5,9 @@ milestones:
 project:
   title: TMDB - Backlog
   viewName: Backlog
+  viewSort:
+    field: Title
+    direction: asc
   backlogColumns:
     - Title
     - Epic

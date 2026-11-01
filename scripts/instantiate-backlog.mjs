@@ -47,6 +47,17 @@ export function validateBacklog(config) {
       config.project.viewName.trim(),
     'Nom de vue manquant.',
   );
+  if (config.project.viewSort !== undefined) {
+    const sort = config.project.viewSort;
+    requireValue(
+      sort !== null &&
+        typeof sort.field === 'string' &&
+        sort.field.trim() === sort.field &&
+        sort.field.length > 0 &&
+        ['asc', 'desc'].includes(sort.direction),
+      'viewSort doit definir un field non vide et une direction asc ou desc.',
+    );
+  }
   if (config.project.backlogColumns !== undefined)
     requireValue(
       Array.isArray(config.project.backlogColumns) &&
@@ -302,6 +313,152 @@ function graphql(run, query, variables) {
 
 function json(run, args) {
   return JSON.parse(run(args));
+}
+
+export function ensureViewSorting(
+  run,
+  project,
+  owner,
+  fields,
+  names,
+  sort,
+  log,
+) {
+  const field = fields.find((candidate) => candidate.name === sort.field);
+  requireValue(field?.id, `Champ de tri inconnu : ${sort.field}.`);
+  const views = [];
+  let cursor = null;
+  do {
+    const data = graphql(
+      run,
+      `
+        query ($id: ID!, $cursor: String) {
+          node(id: $id) {
+            ... on ProjectV2 {
+              views(first: 100, after: $cursor) {
+                nodes {
+                  id
+                  name
+                  sortByFields(first: 100) {
+                    nodes {
+                      direction
+                      field {
+                        ... on ProjectV2Field {
+                          id
+                        }
+                        ... on ProjectV2SingleSelectField {
+                          id
+                        }
+                        ... on ProjectV2IterationField {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
+            }
+          }
+        }
+      `,
+      { id: project.id, cursor },
+    );
+    requireValue(data.node?.views, 'Impossible de lire le tri des vues.');
+    views.push(...data.node.views.nodes);
+    cursor = data.node.views.pageInfo.hasNextPage
+      ? data.node.views.pageInfo.endCursor
+      : null;
+  } while (cursor);
+  let endpoint;
+  let fieldId;
+  for (const name of new Set(names)) {
+    let view = views.find((candidate) => candidate.name === name);
+    if (!view && views.length === 1 && views[0].name === 'View 1') {
+      ensureBacklogView(run, project.id, name, log);
+      view = views[0];
+      view.name = name;
+    }
+    if (view) {
+      const criteria = view.sortByFields?.nodes;
+      requireValue(
+        Array.isArray(criteria),
+        `Impossible de lire le tri de ${name}.`,
+      );
+      if (
+        criteria.length !== 1 ||
+        criteria[0].field?.id !== field.id ||
+        criteria[0].direction !== sort.direction.toUpperCase()
+      )
+        log(
+          `Tri de ${name} a ajuster manuellement dans GitHub : ${sort.field} (${sort.direction}). L'API ne permet pas de modifier le tri d'une vue existante.`,
+        );
+      continue;
+    }
+    if (!endpoint) {
+      const account = json(run, ['api', `users/${owner}`]);
+      requireValue(
+        ['User', 'Organization'].includes(account.type) &&
+          Number.isSafeInteger(account.id) &&
+          account.id > 0,
+        'Proprietaire du projet invalide.',
+      );
+      endpoint =
+        account.type === 'Organization'
+          ? `orgs/${owner}/projectsV2/${project.number}`
+          : `users/${account.id}/projectsV2/${project.number}`;
+      const pages = json(run, [
+        'api',
+        `${endpoint}/fields?per_page=100`,
+        '--paginate',
+        '--slurp',
+        '-H',
+        'X-GitHub-Api-Version: 2026-03-10',
+      ]);
+      requireValue(
+        Array.isArray(pages) && pages.every(Array.isArray),
+        'Liste des champs REST invalide.',
+      );
+      fieldId = pages
+        .flat()
+        .find((candidate) => candidate.node_id === field.id)?.id;
+      requireValue(
+        Number.isSafeInteger(fieldId) && fieldId > 0,
+        `Identifiant REST du champ ${sort.field} absent.`,
+      );
+    }
+    const created = JSON.parse(
+      run(
+        [
+          'api',
+          `${endpoint}/views`,
+          '--method',
+          'POST',
+          '--input',
+          '-',
+          '-H',
+          'X-GitHub-Api-Version: 2026-03-10',
+        ],
+        JSON.stringify({
+          name,
+          layout: 'table',
+          sort_by: [[fieldId, sort.direction]],
+        }),
+      ),
+    );
+    requireValue(
+      created.node_id &&
+        created.name === name &&
+        JSON.stringify(created.sort_by) ===
+          JSON.stringify([[fieldId, sort.direction]]),
+      `Creation de la vue ${name} sans le tri attendu.`,
+    );
+    views.push({ id: created.node_id, name });
+    log(`Vue ${name} creee, tri : ${sort.field} (${sort.direction}).`);
+  }
 }
 
 function ensureTypeViews(
@@ -1090,6 +1247,13 @@ export function instantiate(config, options, run = gh, log = console.log) {
     log(
       `Simulation : ${options.repo}${options.owner ? `, proprietaire ${options.owner}` : ''}, ${allTickets.length} tickets. Aucune requete GitHub.`,
     );
+    const sort = config.project.viewSort ?? {
+      field: 'Title',
+      direction: 'asc',
+    };
+    log(
+      `Tri des nouvelles vues : ${sort.field} (${sort.direction}). Les ecarts des vues existantes seront signales sans modification.`,
+    );
     if (options['update-existing']) {
       log(
         'Avec --apply, les titres et descriptions existants seront remplaces par la configuration, y compris les modifications manuelles.',
@@ -1302,7 +1466,6 @@ export function instantiate(config, options, run = gh, log = console.log) {
     `Reprise : npm run backlog:instantiate -- --repo ${options.repo} --owner ${options.owner} --project-number ${project.number} --apply`,
   );
   const number = String(project.number);
-  ensureBacklogView(run, project.id, config.project.viewName, log);
   let fields = json(run, [
     'project',
     'field-list',
@@ -1459,6 +1622,21 @@ export function instantiate(config, options, run = gh, log = console.log) {
     : allTickets.some((ticket) => ticket.scope !== undefined)
       ? [...visibleFields, scopeField.id]
       : visibleFields;
+  ensureViewSorting(
+    run,
+    project,
+    options.owner,
+    fields,
+    [
+      config.project.viewName,
+      ...(scopeField ? ['Backlog backend', 'Backlog frontend'] : []),
+      ...(options['create-issues']
+        ? config.project.typeViews.map((view) => view.name)
+        : []),
+    ],
+    config.project.viewSort ?? { field: 'Title', direction: 'asc' },
+    log,
+  );
   ensureBacklogColumns(
     run,
     project.id,
