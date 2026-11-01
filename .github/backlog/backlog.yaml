@@ -176,7 +176,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
         size: M
-        priority: P3
+        priority: P2
         dependsOn: [DASHBOARD-05]
         acceptance:
           - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
@@ -485,7 +485,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux voir tous les widgets intégrés dans le tableau de bord afin d'avoir une vue complète des indicateurs.
         size: M
-        priority: P2
+        priority: P3
         dependsOn: [DASHBOARD-24]
         acceptance:
           - Tous les widgets existants sont visibles et correctement disposés dans le tableau de bord.
