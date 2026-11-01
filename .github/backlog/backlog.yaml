@@ -146,7 +146,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
         size: M
-        priority: P3
+        priority: P2
         dependsOn: [DASHBOARD-03]
         acceptance:
           - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
@@ -177,7 +177,7 @@ epics:
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
         size: M
         priority: P3
-        dependsOn: [DASHBOARD-02]
+        dependsOn: [DASHBOARD-05]
         acceptance:
           - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
         definitionOfDone:
