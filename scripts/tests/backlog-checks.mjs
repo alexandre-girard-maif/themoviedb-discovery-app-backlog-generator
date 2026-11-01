@@ -121,7 +121,7 @@ test('legacy field names are renamed without recreating fields or changing optio
     assert.ok(
       !(
         args[1] === 'field-create' &&
-        (args.includes('Scope') || args.includes('Category'))
+        (args.includes('Scope') || args.includes('Notation'))
       ),
     );
     return f.run(args, input);
@@ -130,7 +130,7 @@ test('legacy field names are renamed without recreating fields or changing optio
   instantiate(f.small, f.options, run, () => {});
   assert.deepEqual(renames, [
     { id: 'scope', name: 'Scope' },
-    { id: 'category', name: 'Category' },
+    { id: 'category', name: 'Notation' },
   ]);
   assert.deepEqual(
     field.options.map((option) => option.id),
@@ -773,12 +773,11 @@ test('scope supports backend/frontend and remains optional for older configurati
 });
 
 test('category is optional and accepts only the three grading categories', () => {
-  assert.ok(configuredBacklog.project.backlogColumns.includes('Category'));
-  assert.ok(
-    configuredBacklog.epics
-      .flatMap((epic) => epic.tickets)
-      .every((ticket) => ticket.category === undefined),
-  );
+  assert.ok(configuredBacklog.project.backlogColumns.includes('Notation'));
+  const withoutCategories = structuredClone(config);
+  for (const epic of withoutCategories.epics)
+    for (const ticket of epic.tickets) delete ticket.category;
+  validateBacklog(withoutCategories);
   for (const category of ['socle', 'approfondissement', 'exclu']) {
     const valid = structuredClone(config);
     valid.epics[0].tickets[0].category = category;
@@ -793,19 +792,19 @@ test('category is optional and accepts only the three grading categories', () =>
 
 test('category field is created, colored and displayed in Backlog views without assigning a default', () => {
   const f = fixture({ existing: true, scope: 'backend' });
-  f.small.project.backlogColumns = ['Title', 'Category', 'Scope'];
+  f.small.project.backlogColumns = ['Title', 'Notation', 'Scope'];
   let field;
   let creations = 0;
   let colorChanges = 0;
   const columns = [];
   const run = (args, input) => {
-    if (args[1] === 'field-create' && args.includes('Category')) {
+    if (args[1] === 'field-create' && args.includes('Notation')) {
       creations++;
       assert.ok(args.includes('SINGLE_SELECT'));
       assert.ok(args.includes('socle,approfondissement,exclu'));
       field = {
         id: 'category',
-        name: 'Category',
+        name: 'Notation',
         options: [
           ...['socle', 'approfondissement', 'exclu'].map((name) => ({
             id: name,
@@ -873,7 +872,7 @@ test('categories are assigned to issues and drafts, preserved on reruns and over
     ticket.category = 'socle';
     const field = {
       id: 'category',
-      name: 'Category',
+      name: 'Notation',
       options: ['socle', 'approfondissement', 'exclu'].map((name, i) => ({
         id: name,
         name,
@@ -897,7 +896,7 @@ test('categories are assigned to issues and drafts, preserved on reruns and over
           return JSON.stringify({ data: { node: { options: field.options } } });
         if (query.includes('items(first:')) {
           const values = selected
-            ? [{ field: { name: 'Category' }, name: selected }]
+            ? [{ field: { name: 'Notation' }, name: selected }]
             : [];
           if (drafts)
             return JSON.stringify({

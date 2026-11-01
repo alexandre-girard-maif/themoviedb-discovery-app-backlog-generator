@@ -11,7 +11,7 @@ const defaultConfig = new URL(
   import.meta.url,
 );
 const fieldNames = ['Size', 'Epic', 'Priority'];
-const categoryFieldName = 'Category';
+const categoryFieldName = 'Notation';
 const categoryPalette = [
   { name: 'socle', color: 'GREEN' },
   { name: 'approfondissement', color: 'BLUE' },
@@ -1558,6 +1558,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
   for (const [previousName, name] of [
     ['scope', 'Scope'],
     ['Catégorie', categoryFieldName],
+    ['Category', categoryFieldName],
   ]) {
     const previous = fields.find((field) => field.name === previousName);
     if (!previous) continue;

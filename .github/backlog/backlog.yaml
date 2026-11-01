@@ -14,7 +14,7 @@ project:
     - Size
     - Scope
     - Priority
-    - Category
+    - Notation
     - dependsOn
     - Status
   typeViews:

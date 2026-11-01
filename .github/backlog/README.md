@@ -253,14 +253,14 @@ uniquement Epic et Size aux colonnes visibles si nécessaire.
 
 ### Catégorie pédagogique
 
-Les champs affichés dans GitHub sont nommés **Category** et **Scope**.
+Les champs affichés dans GitHub sont nommés **Notation** et **Scope**.
 Les propriétés des tickets YAML restent `category` et `scope`.
-À l'import, les anciens champs `Catégorie` et `scope` sont renommés sans
+À l'import, les anciens champs `Catégorie`, `Category` et `scope` sont renommés sans
 recréation, pour conserver leurs valeurs et identifiants. Si l'ancien et
 le nouveau nom coexistent, l'import demande de fusionner les champs avant
 de continuer plutôt que d'en abandonner les données.
 
-La colonne **Category** est un champ à sélection unique visible dans Backlog
+La colonne **Notation** est un champ à sélection unique visible dans Backlog
 et ses vues backend/frontend. Elle propose **socle** (vert),
 **approfondissement** (bleu) et **exclu** (gris), pour les brouillons comme
 pour les issues. Ces catégories servent à la notation ; `exclu` ne supprime
@@ -280,12 +280,12 @@ Une catégorie absente du YAML laisse le champ existant inchangé,
 y compris avec `--force-update`. Une catégorie déclarée renseigne un champ
 vide ; `--force-update` remplace aussi une catégorie déjà renseignée.
 
-Le champ est créé si `Category` figure dans `project.backlogColumns` ou si un
+Le champ est créé si `Notation` figure dans `project.backlogColumns` ou si un
 ticket déclare `category`. Les relances réutilisent le champ et ses options,
 appliquent les couleurs prévues et conservent les identifiants, descriptions
 et options personnalisées. Un champ existant d'un autre type provoque une erreur.
 Pour afficher la colonne dans une configuration personnalisée, ajouter
-`Category` à `project.backlogColumns`. Sans liste explicite, elle est ajoutée
+`Notation` à `project.backlogColumns`. Sans liste explicite, elle est ajoutée
 aux colonnes Backlog lorsque le champ existe.
 
 Le tri des vues gérées par le générateur (Backlog, Backlog backend/frontend et
