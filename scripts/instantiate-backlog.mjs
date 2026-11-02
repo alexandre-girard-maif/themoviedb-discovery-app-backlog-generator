@@ -1026,6 +1026,15 @@ function keepFieldValue(nodes, name, value, forceUpdate) {
   );
 }
 
+function findProjectField(fields, name) {
+  const normalizedName = name.toLowerCase();
+  return fields.find(
+    (field) =>
+      typeof field.name === 'string' &&
+      field.name.toLowerCase() === normalizedName,
+  );
+}
+
 function instantiateDrafts(config, options, run, log, project) {
   const items = [];
   let cursor = null;
@@ -1537,7 +1546,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
     'Ajouter manuellement l option Backlog au champ Status du projet existant, puis relancer.',
   );
   if (config.project.backlogColumns?.includes('dependsOn')) {
-    const field = fields.find((candidate) => candidate.name === 'dependsOn');
+    const field = findProjectField(fields, 'dependsOn');
     if (!field)
       run([
         'project',
@@ -1608,9 +1617,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
       : []),
   ];
   for (const specification of specifications) {
-    const field = fields.find(
-      (candidate) => candidate.name === specification.name,
-    );
+    const field = findProjectField(fields, specification.name);
     if (!field) {
       const args = [
         'project',
@@ -1646,12 +1653,12 @@ export function instantiate(config, options, run = gh, log = console.log) {
     options.repo,
   ]);
   const visibleFields = ['Title', 'Epic', 'Size'].map((name) => {
-    const field = fields.find((candidate) => candidate.name === name);
+    const field = findProjectField(fields, name);
     requireValue(field, `Champ ${name} absent.`);
     return field.id;
   });
   ensureSelectColors(run, visibleFields[2], config.sizes, 'Size');
-  const priorityField = fields.find((field) => field.name === 'Priority');
+  const priorityField = findProjectField(fields, 'Priority');
   requireValue(priorityField?.id, 'Champ Priority absent.');
   ensureSelectColors(run, priorityField.id, priorityPalette, 'Priority');
   ensureSelectColors(run, visibleFields[1], epicPalette, 'Epic', true);
@@ -1687,7 +1694,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
     );
   const backlogColumns = config.project.backlogColumns
     ? config.project.backlogColumns.map((name) => {
-        const field = fields.find((candidate) => candidate.name === name);
+        const field = findProjectField(fields, name);
         requireValue(field?.id, `Colonne Backlog inconnue : ${name}.`);
         return field.id;
       })

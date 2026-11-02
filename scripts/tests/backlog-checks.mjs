@@ -1925,6 +1925,26 @@ test('new project receives all custom fields with their expected types', () => {
   );
 });
 
+test('existing scope field is reused regardless of capitalization', () => {
+  const f = fixture({ existing: true, scope: 'frontend' });
+  f.small.project.backlogColumns = ['Title', 'Epic', 'Size', 'scope', 'Status'];
+  function capitalizedScope(args, input) {
+    const result = f.run(args, input);
+    if (args[1] !== 'field-list') return result;
+    const data = JSON.parse(result);
+    data.fields.find((field) => field.name === 'scope').name = 'Scope';
+    return JSON.stringify(data);
+  }
+  instantiate(f.small, f.options, capitalizedScope, () => {});
+  assert.ok(
+    !f.calls.some(
+      ({ args }) =>
+        args[1] === 'field-create' &&
+        args[args.indexOf('--name') + 1]?.toLowerCase() === 'scope',
+    ),
+  );
+});
+
 test('resume searches all issue pages and all project item pages', () => {
   const { small, calls, run, options } = fixture({ existing: true });
   let itemPages = 0;
