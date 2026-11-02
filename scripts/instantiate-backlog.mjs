@@ -335,7 +335,7 @@ export function ensureViewSorting(
   sort,
   log,
 ) {
-  const field = fields.find((candidate) => candidate.name === sort.field);
+  const field = findProjectField(fields, sort.field);
   requireValue(field?.id, `Champ de tri inconnu : ${sort.field}.`);
   const views = [];
   let cursor = null;
@@ -1002,7 +1002,7 @@ function pruneIssues(config, issues, items, projectId, run, log, apply) {
 }
 
 export function syncDependencies(run, projectId, itemId, fields, ticket) {
-  const field = fields.find((field) => field.name === 'dependsOn');
+  const field = findProjectField(fields, 'dependsOn');
   if (!field) return;
   run([
     'project',
@@ -1020,7 +1020,10 @@ export function syncDependencies(run, projectId, itemId, fields, ticket) {
 }
 
 function keepFieldValue(nodes, name, value, forceUpdate) {
-  const current = nodes?.find((entry) => entry.field?.name === name);
+  const normalizedName = name.toLowerCase();
+  const current = nodes?.find(
+    (entry) => entry.field?.name?.toLowerCase() === normalizedName,
+  );
   return (
     current && (!forceUpdate || name === 'Status' || current.name === value)
   );
@@ -1233,7 +1236,7 @@ function instantiateDrafts(config, options, run, log, project) {
         )
       )
         continue;
-      const field = fields.find((field) => field.name === name);
+      const field = findProjectField(fields, name);
       const option = field?.options?.find((option) => option.name === value);
       requireValue(option, `Option ${value} absente de ${name}.`);
       run([
@@ -1497,7 +1500,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
     '--limit',
     '100',
   ]).fields;
-  const status = fields.find((field) => field.name === 'Status');
+  const status = findProjectField(fields, 'Status');
   requireValue(
     status?.options,
     'Le projet doit posseder le champ natif Status.',
@@ -1931,7 +1934,7 @@ export function instantiate(config, options, run = gh, log = console.log) {
         )
       )
         continue;
-      const field = fields.find((candidate) => candidate.name === name);
+      const field = findProjectField(fields, name);
       requireValue(field, `Champ ${name} absent.`);
       const args = [
         'project',

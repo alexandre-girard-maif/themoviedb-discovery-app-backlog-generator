@@ -1551,8 +1551,14 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   const draftOptions = { ...f.options, 'create-issues': false };
   let items = [];
   let creates = 0;
+  let scopeEdits = 0;
   const mutations = [];
   function drafts(args, input) {
+    if (args[1] === 'field-list') {
+      const data = JSON.parse(f.run(args, input));
+      data.fields.find((field) => field.name === 'scope').name = 'Scope';
+      return JSON.stringify(data);
+    }
     if (args[1] === 'graphql') {
       const { query, variables } = JSON.parse(input);
       if (query.includes('... on DraftIssue') && query.includes('items(first:'))
@@ -1589,6 +1595,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
     }
     if (args[1] === 'item-edit') {
       const field = args[args.indexOf('--field-id') + 1];
+      if (field === 'scope') scopeEdits++;
       const name = {
         status: 'Status',
         size: 'Size',
@@ -1604,6 +1611,7 @@ test('apply defaults to draft tickets, reuses stable keys and never creates issu
   instantiate(f.small, draftOptions, drafts, () => {});
   instantiate(f.small, draftOptions, drafts, () => {});
   assert.equal(creates, 1);
+  assert.equal(scopeEdits, 1);
   const viewWrites = f.calls
     .filter(({ args }) => args[1] === 'graphql')
     .map(({ input }) => JSON.parse(input));
