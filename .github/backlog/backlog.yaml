@@ -12,8 +12,9 @@ project:
     - Title
     - Epic
     - Size
-    - scope
+    - Scope
     - Priority
+    - Notation
     - dependsOn
     - Status
   typeViews:
@@ -81,6 +82,7 @@ epics:
 
           Retrouver un film déjà collecté doit permettre d'actualiser sa description, ses genres, ses pays et la date de l'observation, sans créer un doublon ni retirer les films des autres années. Ces informations doivent rester cohérentes entre elles.
         size: S
+        category: exclu
         priority: P1
         milestone: 2.0.0
         dependsOn: []
@@ -115,6 +117,7 @@ epics:
           ```
 
         size: M
+        category: exclu
         priority: P1
         milestone: 2.0.0
         dependsOn: [DASHBOARD-01]
@@ -136,28 +139,64 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres
           afin de maintenir une liste de genres cohérente et à jour.
+
+          Un module dédié **src/back-end/database/genre-repository.ts** expose la recherche par identifiant, la liste des genres et
+          l'insertion ou l'actualisation de leurs libellés. Un genre est représenté
+          par un identifiant numérique `id` et un nom `name`.
         size: M
+        category: socle
         priority: P1
         dependsOn: [DASHBOARD-02]
         acceptance:
-          - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés.
+          - La recherche par identifiant renvoie le genre correspondant ou `undefined` si aucun genre n'existe.
+          - La liste renvoie les genres triés par identifiant croissant.
+          - L'insertion ou la mise à jour accepte un itérable de genres ; un identifiant existant entraîne la mise à jour du nom sans créer de doublon.
+          - Un itérable vide ne modifie pas les données ; si un identifiant apparaît plusieurs fois, le dernier libellé fourni est conservé.
         definitionOfDone:
-          - Le module dédié aux genres est implémenté.
-          - Des test unitaires couvrent la recherche, l'insertion et la mise à jour des genres.
+          - Le module de gestion des genres est implémenté en TypeScript avec `node:sqlite` et utilise le type `Genre`.
+          - Des tests unitaires sur une base SQLite en mémoire couvrent la recherche d'un genre présent ou absent, la liste, l'insertion et la mise à jour sans doublon.
+          - Des tests couvrent les tableaux et autres itérables, l'entrée vide, les identifiants répétés et la contrainte de nom obligatoire.
       - id: DASHBOARD-04
         key: EXPL-GENRES-CSV
         type: feature
         scope: backend
-        title: Importer et mettre à jour les genres à partir d'un fichier CSV
+        title: Importer les genres depuis un CSV et nettoyer les genres inutilisés
         story: |
-          En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les genres à partir d'un fichier CSV afin de maintenir une liste de genres cohérente et à jour.
+          En tant que gestionnaire de la base de données des films, je veux importer
+          ou actualiser les genres depuis un fichier CSV et supprimer les genres
+          inutilisés afin de maintenir un catalogue cohérent.
+
+          Le CSV contient exactement les colonnes `id` et `name`. La commande
+          `add-genres` utilise le module de gestion des genres de DASHBOARD-03 :
+
+          ```sh
+          node src/back-end/backend-cli.ts add-genres ./data/genres.csv
+          node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite add-genres ./data/genres.csv
+          ```
+
+          La commande `clean-genres` supprime uniquement les genres sans association
+          à un film et accepte également le chemin configurable de la base :
+
+          ```sh
+          node src/back-end/backend-cli.ts clean-genres
+          ```
         size: M
+        category: approfondissement
         priority: P2
         dependsOn: [DASHBOARD-03]
         acceptance:
-          - Un module dédié permet de rechercher un genre par identifiant, de lister les genres triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
+          - Le parseur CSV accepte exactement les en-têtes `id` et `name`, dans n'importe quel ordre et sans distinction de casse.
+          - Les fins de ligne LF et CRLF, le BOM UTF-8, les virgules dans les champs entre guillemets et les guillemets échappés sont pris en charge ; les lignes vides sont ignorées.
+          - Les identifiants sont des entiers positifs représentables sans perte de précision et les noms sont non vides ; les en-têtes, valeurs et syntaxes CSV invalides provoquent une erreur explicite.
+          - La commande `add-genres <csv-file>` insère ou actualise les genres dans la base par défaut ou celle sélectionnée par `--path`, sans créer de doublons.
+          - Le CSV est validé avant l'ouverture de la base ; l'import est transactionnel, annulé en cas d'échec et l'erreur est propagée.
+          - La commande `clean-genres` supprime uniquement les genres absents de `movie_genres` et conserve les genres associés à un film.
+          - Les commandes ferment la connexion SQLite et affichent le nombre de genres importés ou supprimés ainsi que le chemin de la base.
         definitionOfDone:
-          - Le module dédié aux genres est implémenté pour gérer l'importation depuis un fichier CSV.
+          - Le parseur CSV est implémenté avec `csv-parse/sync` et les commandes `add-genres` et `clean-genres` sont intégrées au CLI existant.
+          - Des tests unitaires couvrent les formats CSV acceptés, les lignes vides, les valeurs invalides et les guillemets mal formés.
+          - Des tests du CLI couvrent l'import dans une base sélectionnée, la transaction, le nettoyage limité aux genres inutilisés, la fermeture de la connexion et les messages de résultat.
+          - Un fichier d'exemple `data/genres.csv` est fourni et les commandes d'import et de nettoyage sont documentées.
       - id: DASHBOARD-05
         key: EXPL-COUNTRIES-CSV
         type: feature
@@ -166,44 +205,106 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays
           afin de maintenir une liste de pays cohérente et à jour.
+
+          Un module dédié **src/back-end/database/country-repository.ts** expose la recherche par code, la liste des pays et
+          l'insertion ou l'actualisation de leurs libellés. Un pays est représenté
+          par un code `code` et un nom `name`.
         size: M
+        category: socle
         priority: P1
         dependsOn: [DASHBOARD-02]
         acceptance:
-          - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés.
+          - La recherche par code renvoie le pays correspondant ou `undefined` si aucun pays n'existe.
+          - La liste renvoie les pays triés par code croissant et une liste vide si aucun pays n'est enregistré.
+          - L'insertion ou la mise à jour accepte un itérable de pays ; un code existant entraîne la mise à jour du nom sans créer de doublon.
+          - Un itérable vide ne modifie pas les données ; si un code apparaît plusieurs fois, le dernier libellé fourni est conservé.
         definitionOfDone:
-          - Le module dédié aux pays est implémenté.
-          - Des test unitaires couvrent la recherche, l'insertion et la mise à jour des pays.
+          - Le module de gestion des pays est implémenté en TypeScript avec `node:sqlite` et utilise le type `Country`.
+          - Des tests unitaires sur une base SQLite en mémoire couvrent la recherche d'un pays présent ou absent, la liste vide, le tri par code, l'insertion et la mise à jour sans doublon.
+          - Des tests couvrent les tableaux et autres itérables, l'entrée vide et les codes répétés.
       - id: DASHBOARD-06
         key: EXPL-COUNTRIES-CSV-IMPORT
         type: feature
         scope: backend
-        title: Importer et mettre à jour les pays à partir d'un fichier CSV
+        title: Importer les pays depuis un CSV et nettoyer les pays inutilisés
         story: |
-          En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les pays à partir d'un fichier CSV afin de maintenir une liste de pays cohérente et à jour.
+          En tant que gestionnaire de la base de données des films, je veux importer
+          ou actualiser les pays depuis un fichier CSV et supprimer les pays
+          inutilisés afin de maintenir un catalogue cohérent.
+
+          Le CSV contient exactement les colonnes `code` et `name`. Les codes pays
+          sont au format de deux lettres majuscules, comme `FR`, `GB` ou `US`.
+          La commande `add-countries` utilise le module de gestion des pays de DASHBOARD-05 :
+
+          ```sh
+          node src/back-end/backend-cli.ts add-countries ./data/countries.csv
+          node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite add-countries ./data/countries.csv
+          ```
+
+          La commande `clean-countries` supprime uniquement les pays sans association
+          à un film dans `production_countries` :
+
+          ```sh
+          node src/back-end/backend-cli.ts clean-countries
+          node src/back-end/backend-cli.ts --path ./data/custom-movies.sqlite clean-countries
+          ```
         size: M
+        category: exclu
         priority: P2
         dependsOn: [DASHBOARD-05]
         acceptance:
-          - Un module dédié permet de rechercher un pays par identifiant, de lister les pays triés par identifiant et d'insérer ou actualiser leurs libellés à partir d'un fichier CSV.
+          - Le parseur CSV accepte exactement les en-têtes `code` et `name`, dans n'importe quel ordre et sans distinction de casse.
+          - Les fins de ligne LF et CRLF, le BOM UTF-8, les espaces autour des valeurs, les virgules dans les champs entre guillemets et les guillemets échappés sont pris en charge.
+          - Les lignes vides sont ignorées et un document contenant uniquement les en-têtes renvoie une liste vide.
+          - Les codes contiennent exactement deux lettres majuscules et les noms sont non vides ; les en-têtes, valeurs et syntaxes CSV invalides provoquent une erreur explicite.
+          - La commande `add-countries <csv-file>` insère ou actualise les pays dans la base par défaut ou celle sélectionnée par `--path`, sans créer de doublons.
+          - Le CSV est validé avant l'ouverture de la base ; l'import est transactionnel, annulé en cas d'échec et l'erreur est propagée.
+          - La commande `clean-countries` supprime uniquement les pays absents de `production_countries` et conserve les pays associés à un film.
+          - Les commandes ferment la connexion SQLite et affichent le nombre de pays importés ou supprimés ainsi que le chemin de la base.
         definitionOfDone:
-          - Le module dédié aux pays est implémenté pour gérer l'importation depuis un fichier CSV.
+          - Le parseur CSV est implémenté avec `csv-parse/sync` et les commandes `add-countries` et `clean-countries` sont intégrées au CLI existant.
+          - Des tests unitaires couvrent les formats CSV acceptés, les lignes vides, le document limité aux en-têtes, les codes et noms invalides et les guillemets mal formés.
+          - Des tests du CLI couvrent l'import, le chemin configurable, l'annulation en cas d'échec, le nettoyage limité aux pays inutilisés, la fermeture de la connexion et les messages de résultat.
+          - Un fichier d'exemple `data/countries.csv` est fourni et les commandes d'import et de nettoyage sont documentées.
       - id: DASHBOARD-07
         key: DASHBOARD-07
         type: feature
         scope: backend
-        title: Consommer et exposer l'API discover
+        title: Exposer les films par année via l'API Discover
         story: |
-          En tant que gestionnaire de la base de données des films, je veux pouvoir consommer et exposer l'API discover afin de récupérer les films d'une année donnée.
+          En tant que gestionnaire de la base de données des films, je veux consulter
+          les films d'une année de sortie principale via une API interne qui interroge
+          l'API Discover de TMDB.
+
+          La route `GET /api/discover/movies` accepte une année obligatoire et les
+          paramètres optionnels `language`, `page` et `region` :
+
+          ```text
+          /api/discover/movies?year=2020
+          /api/discover/movies?year=2020&language=en-US&page=2&region=US
+          ```
+
+          Chaque appel récupère une seule page. Le paramètre `page` permet de consulter
+          les suivantes ; cette route ne déclenche ni collecte automatique de toutes
+          les pages, ni enrichissement par le détail d'un film, ni stockage SQLite.
         size: M
+        category: socle
         priority: P2
         dependsOn: []
         acceptance:
-          - L'API discover est consommée pour récupérer les films d'une année donnée.
-          - Les films récupérés sont exposés via une API interne.
+          - La route `GET /api/discover/movies` transmet `year` à l'API TMDB `GET /3/discover/movie` avec le filtre `primary_release_year`.
+          - Le paramètre `year` est une chaîne de quatre chiffres comprise entre 1000 et 9999 ; une valeur absente ou invalide renvoie HTTP 400 avec un message explicite, sans appel à TMDB.
+          - Les valeurs non vides de `language`, `page` et `region` fournies comme chaînes sont transmises à TMDB ; sinon les valeurs par défaut sont respectivement `fr-FR`, `1` et `FR`.
+          - L'appel TMDB utilise le jeton d'accès configuré côté serveur, sans l'exposer dans la réponse.
+          - La réponse conserve les champs `page`, `results`, `total_pages` et `total_results` ; chaque film est converti au format supporté par `movies-api`, sans les propriétés `adult` et `video`.
+          - Une réponse sans films est renvoyée avec une liste `results` vide et les informations de pagination fournies par TMDB.
+          - Un échec HTTP TMDB, réseau ou de lecture JSON est journalisé côté serveur et renvoie HTTP 500 avec le message `Failed to discover movies`.
         definitionOfDone:
-          - L'intégration avec l'API discover est implémentée.
-          - Des tests couvrent la récupération et l'exposition des films.
+          - Le module Discover est implémenté en TypeScript et sa route est enregistrée dans le serveur Express existant.
+          - Des tests avec l'appel TMDB simulé couvrent le filtre d'année, les options par défaut et personnalisées, la conversion des films et une réponse vide.
+          - Des tests couvrent les années absentes ou invalides, y compris les valeurs multiples ou structurées, et vérifient qu'aucun appel TMDB n'est effectué.
+          - Des tests couvrent les erreurs HTTP, réseau et JSON, leurs réponses HTTP 500 et leur journalisation.
+          - L'enregistrement de la route est testé et les paramètres, la pagination et les erreurs sont documentés.
       - id: DASHBOARD-08
         key: DASHBOARD-08
         type: feature
@@ -212,6 +313,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir créer et mettre à jour les films afin de maintenir une liste de films cohérente et à jour.
         size: M
+        category: socle
         priority: P3
         dependsOn: []
         acceptance:
@@ -227,6 +329,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir importer et mettre à jour les films à partir d'un fichier CSV afin de maintenir une liste de films cohérente et à jour.
         size: M
+        category: exclu
         priority: P3
         dependsOn: []
         acceptance:
@@ -242,6 +345,7 @@ epics:
         story: |
           En tant que gestionnaire de la base de données des films, je veux pouvoir mettre à jour les films, genres et pays à partir des APIs mises en place afin de maintenir une liste de films cohérente et à jour.
         size: L
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-03, DASHBOARD-05, DASHBOARD-08]
         acceptance:
@@ -257,6 +361,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux pouvoir accéder à la page de tableau de bord des films même si aucun widget n'est encore configuré afin de visualiser les informations de base.
         size: M
+        category: exclu
         priority: P3
         dependsOn: []
         acceptance:
@@ -272,6 +377,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux pouvoir visualiser les futurs widgets et leurs différents états dans le storybook afin de faciliter le développement et la validation des composants.
         size: S
+        category: exclu
         priority: P3
         dependsOn: []
         acceptance:
@@ -287,6 +393,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux pouvoir voir le widget "Films en base" sur la page de tableau de bord des films afin d'accéder rapidement aux informations sur les films disponibles.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -303,6 +410,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux consulter la durée moyenne des films du catalogue pour comprendre leur format.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -320,6 +428,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux consulter la note moyenne des films pour apprécier la qualité du catalogue.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -337,6 +446,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le pays le plus représenté et le nombre de films associés pour situer l'origine du catalogue.
         size: S
+        category: exclu
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -354,6 +464,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film le mieux noté pour découvrir un titre apprécié.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -371,6 +482,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film le plus populaire pour découvrir le titre qui suscite le plus d'intérêt.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -388,6 +500,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film présentant le meilleur retour sur investissement pour comparer sa rentabilité.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -406,6 +519,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le film présentant le plus faible retour sur investissement pour repérer les pertes.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -423,6 +537,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux connaître le nombre de genres représentés pour apprécier la diversité du catalogue.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -440,6 +555,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux identifier le genre le plus présent et son effectif pour comprendre la tendance du catalogue.
         size: S
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -457,6 +573,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux connaître le genre ayant la meilleure note moyenne pour comparer les genres du catalogue.
         size: S
+        category: approfondissement
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -474,6 +591,7 @@ epics:
         story: |
           En tant qu'utilisateur, je veux connaître le genre ayant la meilleure note pondérée afin de disposer d'un indicateur distinct de la moyenne simple.
         size: S
+        category: exclu
         priority: P3
         dependsOn: [DASHBOARD-12]
         acceptance:
@@ -487,10 +605,11 @@ epics:
         key: DASHBOARD-25
         type: feature
         scope: frontend
-        title: Intégrer l'ensemble des widgets dans le tableau de bord
+        title: Intégrer les widgets dans le tableau de bord
         story: |
           En tant qu'utilisateur, je veux voir tous les widgets intégrés dans le tableau de bord afin d'avoir une vue complète des indicateurs.
         size: M
+        category: socle
         priority: P3
         dependsOn: [DASHBOARD-24]
         acceptance:

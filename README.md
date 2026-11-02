@@ -52,7 +52,7 @@ d'issues doit être demandée explicitement avec `--create-issues --apply`.
 `--prune` nécessite aussi `--create-issues` ; il ne supprime pas les brouillons.
 
 Les vues **Backlog backend** et **Backlog frontend** sont configurées lorsque
-le champ `scope` existe. Elles filtrent les tickets par périmètre, avec les
+le champ `Scope` existe. Elles filtrent les tickets par périmètre, avec les
 mêmes colonnes que Backlog, en mode brouillons comme en mode issues.
 
 `--dry-run` ne contacte pas GitHub. Vérifiez soigneusement le dépôt indiqué

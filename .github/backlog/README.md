@@ -100,7 +100,7 @@ la rend sous forme de cases à cocher, sans liste globale ni valeur par défaut.
 La propriété facultative `scope` indique la couche technique : `backend` ou
 `frontend`. Tous les tickets actuellement spécifiés, y compris DASHBOARD-10,
 déclarent `scope: backend`. À l'import, le générateur crée ou complète le champ
-GitHub **scope** avec ces deux options et le rend visible dans Backlog.
+GitHub **Scope** avec ces deux options et le rend visible dans Backlog.
 Le générateur applique la palette **backend bleu**, **frontend violet**,
 en conservant les identifiants des options et leurs descriptions.
 Priority utilise **P1 rouge**, **P2 orange**, **P3 jaune**. Epic colore les
@@ -121,9 +121,9 @@ personnel. **Backlog** reste la vue globale. Les relances ne dupliquent pas ces
 vues ; les filtres de **Features** et **Bugs** sont synchronisés avec la
 configuration. Title, Epic et Size sont visibles dans Backlog, Features et Bugs.
 
-Lorsque le champ **scope** existe, le générateur configure aussi deux vues
+Lorsque le champ **Scope** existe, le générateur configure aussi deux vues
 tabulaires **Backlog backend** et **Backlog frontend**, filtrées respectivement
-par `scope:backend` et `scope:frontend`. Elles reprennent les colonnes configurées
+par `Scope:backend` et `Scope:frontend`. Elles reprennent les colonnes configurées
 pour Backlog et fonctionnent avec les brouillons comme avec les issues.
 Les relances réutilisent ces vues et synchronisent leurs filtres sans modifier
 le statut ni les estimations des tickets.
@@ -237,7 +237,7 @@ si cette colonne est configurée et synchronisé à chaque instanciation, pour l
 brouillons comme pour les issues. Il ne crée pas de relations natives GitHub.
 
 Cette liste définit les colonnes et leur
-ordre dans Backlog. La configuration actuelle affiche Title, Epic, Size, scope,
+ordre dans Backlog. La configuration actuelle affiche Title, Epic, Size, Scope,
 Priority, Status, Linked pull requests et Sub-issues progress ; Assignees est
 masqué. Les noms sont ceux des champs GitHub, uniques, avec Title en premier.
 Une colonne inconnue provoque une erreur explicite. À chaque instanciation,
@@ -250,6 +250,43 @@ Pour utiliser un tableau Kanban, choisir la disposition **Board** de la vue
 Backlog dans GitHub, la grouper par **Status**, puis afficher Size, Epic et
 Priority. Le script ne modifie pas les filtres ou regroupements ; il ajoute
 uniquement Epic et Size aux colonnes visibles si nécessaire.
+
+### Catégorie pédagogique
+
+Les champs affichés dans GitHub sont nommés **Notation** et **Scope**.
+Les propriétés des tickets YAML restent `category` et `scope`.
+À l'import, les anciens champs `Catégorie`, `Category` et `scope` sont renommés sans
+recréation, pour conserver leurs valeurs et identifiants. Si l'ancien et
+le nouveau nom coexistent, l'import demande de fusionner les champs avant
+de continuer plutôt que d'en abandonner les données.
+
+La colonne **Notation** est un champ à sélection unique visible dans Backlog
+et ses vues backend/frontend. Elle propose **socle** (vert),
+**approfondissement** (bleu) et **exclu** (gris), pour les brouillons comme
+pour les issues. Ces catégories servent à la notation ; `exclu` ne supprime
+pas le ticket et ne le retire pas du projet.
+
+Le YAML peut définir la catégorie d'un ticket avec la propriété facultative
+`category` :
+
+```yaml
+category: socle
+```
+
+Les seules valeurs autorisées sont `socle`, `approfondissement` et `exclu`.
+Les tickets actuels n'ont pas de catégorie préattribuée : l'enseignant peut
+la choisir directement dans GitHub ou dans le YAML.
+Une catégorie absente du YAML laisse le champ existant inchangé,
+y compris avec `--force-update`. Une catégorie déclarée renseigne un champ
+vide ; `--force-update` remplace aussi une catégorie déjà renseignée.
+
+Le champ est créé si `Notation` figure dans `project.backlogColumns` ou si un
+ticket déclare `category`. Les relances réutilisent le champ et ses options,
+appliquent les couleurs prévues et conservent les identifiants, descriptions
+et options personnalisées. Un champ existant d'un autre type provoque une erreur.
+Pour afficher la colonne dans une configuration personnalisée, ajouter
+`Notation` à `project.backlogColumns`. Sans liste explicite, elle est ajoutée
+aux colonnes Backlog lorsque le champ existe.
 
 Le tri des vues gérées par le générateur (Backlog, Backlog backend/frontend et
 Features/Bugs en mode issues) est configurable avec `project.viewSort` :
@@ -274,7 +311,7 @@ affiche le tri souhaité sans aucune requête GitHub.
 
 Pour synchroniser aussi les valeurs existantes à partir du YAML, utiliser
 `--force-update --apply`. Cette option remplace les titres et descriptions,
-Size, Priority, Epic et scope lorsqu'il est déclaré. En mode issues, elle
+Size, Priority, Epic et Scope lorsqu'il est déclaré. En mode issues, elle
 remplace aussi le milestone déclaré et synchronise le type Feature/Bug ;
 dans un dépôt personnel, le label de type opposé est retiré, sans toucher
 aux autres labels. Les brouillons n'ont pas de milestone ni de type natif.
