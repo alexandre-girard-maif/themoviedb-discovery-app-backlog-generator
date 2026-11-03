@@ -138,7 +138,7 @@ test('legacy field names are renamed without recreating fields or changing optio
   );
 });
 
-test('view sorting creates sorted views for both owner types and preserves existing views', () => {
+test('view sorting uses owner logins for fields and view creation and preserves existing views', () => {
   for (const type of ['User', 'Organization']) {
     const views = [
       { id: 'custom', name: 'Custom', sortByFields: { nodes: [] } },
@@ -172,7 +172,7 @@ test('view sorting creates sorted views for both owner types and preserves exist
         assert.ok(args.includes('--paginate') && args.includes('--slurp'));
         return JSON.stringify([[], [{ id: 123, node_id: 'title' }]]);
       }
-      const ownerPath = type === 'User' ? 'users/42' : 'orgs/student';
+      const ownerPath = type === 'User' ? 'users/student' : 'orgs/student';
       assert.equal(args[1], `${ownerPath}/projectsV2/7/views`);
       assert.ok(args.includes('POST'));
       const payload = JSON.parse(input);
@@ -228,7 +228,7 @@ test('view sorting supports descending custom fields and surfaces failures', () 
       assert.equal(args[1], 'users/student/projectsV2/7/fields?per_page=100');
       return JSON.stringify([[{ id: 9, node_id: 'priority' }]]);
     }
-    assert.equal(args[1], 'users/42/projectsV2/7/views');
+    assert.equal(args[1], 'users/student/projectsV2/7/views');
     const payload = JSON.parse(input);
     assert.deepEqual(payload.sort_by, [[9, 'desc']]);
     return JSON.stringify({

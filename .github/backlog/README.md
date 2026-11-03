@@ -302,10 +302,10 @@ Sans cette option, le tri par défaut est **Title en ordre croissant**.
 `field` désigne un champ GitHub existant ; `direction` accepte `asc` ou `desc`.
 Un champ inconnu provoque une erreur explicite. Le tri est enregistré à la
 création des nouvelles vues via l'API REST GitHub. Pour les projets personnels,
-la lecture des champs utilise le login du propriétaire ; la création des vues
-utilise son identifiant numérique, conformément aux endpoints GitHub respectifs.
-L'API ne permet pas de modifier
-le tri des vues existantes : elles sont conservées, y compris la vue initiale
+la lecture des champs et la création des vues utilisent toutes deux le login du
+propriétaire, et non son identifiant numérique (même si la documentation de
+création des vues nomme ce paramètre `user_id`).
+L'API ne permet pas de modifier le tri des vues existantes : elles sont conservées, y compris la vue initiale
 « View 1 » renommée, et le script signale les écarts à ajuster manuellement
 dans GitHub. Les vues personnalisées ne sont pas modifiées. La simulation
 affiche le tri souhaité sans aucune requête GitHub.
