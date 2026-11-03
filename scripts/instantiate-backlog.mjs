@@ -412,20 +412,14 @@ export function ensureViewSorting(
     if (!endpoint) {
       const account = json(run, ['api', `users/${owner}`]);
       requireValue(
-        ['User', 'Organization'].includes(account.type) &&
-          Number.isSafeInteger(account.id) &&
-          account.id > 0,
+        ['User', 'Organization'].includes(account.type),
         'Proprietaire du projet invalide.',
       );
-      endpoint =
-        account.type === 'Organization'
-          ? `orgs/${owner}/projectsV2/${project.number}`
-          : `users/${account.id}/projectsV2/${project.number}`;
-      // User field endpoints require a login, unlike view creation endpoints.
-      const fieldsEndpoint = `${account.type === 'Organization' ? 'orgs' : 'users'}/${owner}/projectsV2/${project.number}`;
+      // Both endpoints require the login, despite views documenting "user_id".
+      endpoint = `${account.type === 'Organization' ? 'orgs' : 'users'}/${owner}/projectsV2/${project.number}`;
       const pages = json(run, [
         'api',
-        `${fieldsEndpoint}/fields?per_page=100`,
+        `${endpoint}/fields?per_page=100`,
         '--paginate',
         '--slurp',
         '-H',
