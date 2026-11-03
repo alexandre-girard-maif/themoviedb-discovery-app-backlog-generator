@@ -421,9 +421,11 @@ export function ensureViewSorting(
         account.type === 'Organization'
           ? `orgs/${owner}/projectsV2/${project.number}`
           : `users/${account.id}/projectsV2/${project.number}`;
+      // User field endpoints require a login, unlike view creation endpoints.
+      const fieldsEndpoint = `${account.type === 'Organization' ? 'orgs' : 'users'}/${owner}/projectsV2/${project.number}`;
       const pages = json(run, [
         'api',
-        `${endpoint}/fields?per_page=100`,
+        `${fieldsEndpoint}/fields?per_page=100`,
         '--paginate',
         '--slurp',
         '-H',
