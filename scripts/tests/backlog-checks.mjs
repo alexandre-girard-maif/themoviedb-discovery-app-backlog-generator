@@ -165,14 +165,16 @@ test('view sorting creates sorted views for both owner types and preserves exist
         });
       }
       if (args[1] === 'users/student') return JSON.stringify({ id: 42, type });
-      const endpoint = type === 'User' ? 'users/42' : 'orgs/student';
-      assert.ok(args[1].startsWith(`${endpoint}/projectsV2/7/`));
       assert.ok(args.includes('X-GitHub-Api-Version: 2026-03-10'));
       if (args[1].includes('/fields?')) {
+        const ownerPath = type === 'User' ? 'users/student' : 'orgs/student';
+        assert.equal(args[1], `${ownerPath}/projectsV2/7/fields?per_page=100`);
         assert.ok(args.includes('--paginate') && args.includes('--slurp'));
         return JSON.stringify([[], [{ id: 123, node_id: 'title' }]]);
       }
-      assert.ok(args[1].endsWith('/views') && args.includes('POST'));
+      const ownerPath = type === 'User' ? 'users/42' : 'orgs/student';
+      assert.equal(args[1], `${ownerPath}/projectsV2/7/views`);
+      assert.ok(args.includes('POST'));
       const payload = JSON.parse(input);
       creations.push(payload);
       return JSON.stringify({
@@ -222,8 +224,11 @@ test('view sorting supports descending custom fields and surfaces failures', () 
       });
     if (args[1] === 'users/student')
       return JSON.stringify({ id: 42, type: 'User' });
-    if (args[1].includes('/fields?'))
+    if (args[1].includes('/fields?')) {
+      assert.equal(args[1], 'users/student/projectsV2/7/fields?per_page=100');
       return JSON.stringify([[{ id: 9, node_id: 'priority' }]]);
+    }
+    assert.equal(args[1], 'users/42/projectsV2/7/views');
     const payload = JSON.parse(input);
     assert.deepEqual(payload.sort_by, [[9, 'desc']]);
     return JSON.stringify({
